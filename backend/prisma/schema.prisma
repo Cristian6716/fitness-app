@@ -1,0 +1,150 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                      String   @id @default(uuid())
+  email                   String   @unique
+  password                String
+  createdAt               DateTime @default(now()) @map("created_at")
+  profile                 Json?    // {age, weight, height, fitness_level}
+  hasCompletedOnboarding  Boolean  @default(false) @map("has_completed_onboarding")
+
+  workoutPlans      WorkoutPlan[]
+  completedSessions CompletedSession[]
+
+  @@map("users")
+}
+
+model WorkoutPlan {
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  name           String
+  durationWeeks  Int      @map("duration_weeks")
+  frequency      Int?     // Number of training sessions per week
+  status         String   @default("active") // active, archived, completed, inactive
+  aiGenerated    Boolean  @default(false) @map("ai_generated")
+  aiPromptData   Json?    @map("ai_prompt_data") // user answers for AI generation
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trainingSessions  TrainingSession[]
+  completedSessions CompletedSession[]
+
+  @@map("workout_plans")
+}
+
+model TrainingSession {
+  id        String @id @default(uuid())
+  planId    String @map("plan_id")
+  name      String // e.g., "Day 1 - Push"
+  dayNumber Int    @map("day_number")
+  order     Int
+
+  plan              WorkoutPlan        @relation(fields: [planId], references: [id], onDelete: Cascade)
+  exercises         Exercise[]
+  completedSessions CompletedSession[]
+
+  @@map("training_sessions")
+}
+
+model Exercise {
+  id           String  @id @default(uuid())
+  sessionId    String  @map("session_id")
+  name         String
+  targetSets   Int     @map("target_sets")
+  targetReps   String  @map("target_reps") // e.g., "8-10"
+  targetWeight Float?  @map("target_weight")
+  restSeconds  Int     @default(60) @map("rest_seconds")
+  order        Int
+  notes        String?
+
+  session       TrainingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  completedSets CompletedSet[]
+
+  @@map("exercises")
+}
+
+model CompletedSession {
+  id                   String    @id @default(uuid())
+  sessionId            String    @map("session_id")
+  userId               String    @map("user_id")
+  planId               String    @map("plan_id")
+
+  // Denormalized fields for historical data (persist even if plan/session deleted)
+  planName             String    @map("plan_name")
+  sessionName          String    @map("session_name")
+
+  startedAt            DateTime  @map("started_at")
+  completedAt          DateTime? @map("completed_at")
+  totalDurationSeconds Int?      @map("total_duration_seconds")
+
+  // Aggregate metrics
+  caloriesBurned       Int?      @map("calories_burned")
+  totalWeightLifted    Float?    @map("total_weight_lifted") // Total volume (kg)
+  totalSets            Int?      @map("total_sets")
+  totalReps            Int?      @map("total_reps")
+
+  rating               Int?      // 1-5
+  notes                String?
+
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  session       TrainingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan          WorkoutPlan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  completedSets CompletedSet[]
+
+  @@index([userId, completedAt])
+  @@index([planId, completedAt])
+  @@map("completed_sessions")
+}
+
+model CompletedSet {
+  id                 String   @id @default(uuid())
+  completedSessionId String   @map("completed_session_id")
+  exerciseId         String   @map("exercise_id")
+
+  // Denormalized for historical data
+  exerciseName       String   @map("exercise_name")
+
+  setNumber          Int      @map("set_number")
+  actualReps         Int      @map("actual_reps")
+  actualWeight       Float?   @map("actual_weight")
+  completed          Boolean  @default(true)
+  completedAt        DateTime @map("completed_at")
+
+  completedSession CompletedSession @relation(fields: [completedSessionId], references: [id], onDelete: Cascade)
+  exercise         Exercise         @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@map("completed_sets")
+}
+
+model NewsArticle {
+  id          String   @id @default(uuid())
+  title       String
+  summary     String?  @db.Text // Short excerpt only (max 200 chars)
+  source      String
+  sourceUrl   String   @map("source_url") // REQUIRED - original article URL
+  imageUrl    String?  @map("image_url")
+  category    String   @default("general")
+  tags        String[]
+  sponsored   Boolean  @default(false)
+  publishedAt DateTime @map("published_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([publishedAt])
+  @@unique([sourceUrl])
+  @@map("news_articles")
+}

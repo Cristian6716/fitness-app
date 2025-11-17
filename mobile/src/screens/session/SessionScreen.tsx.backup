@@ -1,0 +1,740 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  TextInput,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  ScrollView,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RouteProp } from '@react-navigation/native';
+import { RootStackParamList } from '../../navigation/AppNavigator';
+import { TrainingSession, Exercise, CompletedSession } from '../../types/api.types';
+import apiService from '../../services/api.service';
+import { theme } from '../../constants/theme';
+
+type SessionScreenProps = {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'Session'>;
+  route: RouteProp<RootStackParamList, 'Session'>;
+};
+
+interface SetLog {
+  setNumber: number;
+  reps: string;
+  weight: string;
+  completed: boolean;
+}
+
+interface ExerciseState {
+  exerciseId: string;
+  expanded: boolean;
+  sets: SetLog[];
+  allCompleted: boolean;
+}
+
+const SessionScreen: React.FC<SessionScreenProps> = ({ navigation, route }) => {
+  const { sessionId } = route.params;
+  const [session, setSession] = useState<TrainingSession | null>(null);
+  const [completedSessionId, setCompletedSessionId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [sessionStarted, setSessionStarted] = useState(false);
+  const [sessionTime, setSessionTime] = useState(0);
+  const [exerciseStates, setExerciseStates] = useState<{ [key: string]: ExerciseState }>({});
+  const [showRestTimer, setShowRestTimer] = useState(false);
+  const [restTimeRemaining, setRestTimeRemaining] = useState(0);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [notes, setNotes] = useState('');
+  const [isCompletingSession, setIsCompletingSession] = useState(false);
+
+  const sessionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const restTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    loadSession();
+    return () => {
+      if (sessionTimerRef.current) clearInterval(sessionTimerRef.current);
+      if (restTimerRef.current) clearInterval(restTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (sessionStarted && !sessionTimerRef.current) {
+      sessionTimerRef.current = setInterval(() => {
+        setSessionTime((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (sessionTimerRef.current) {
+        clearInterval(sessionTimerRef.current);
+        sessionTimerRef.current = null;
+      }
+    };
+  }, [sessionStarted]);
+
+  useEffect(() => {
+    if (restTimeRemaining > 0) {
+      restTimerRef.current = setInterval(() => {
+        setRestTimeRemaining((prev) => {
+          if (prev <= 1) {
+            setShowRestTimer(false);
+            if (restTimerRef.current) clearInterval(restTimerRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (restTimerRef.current) {
+        clearInterval(restTimerRef.current);
+        restTimerRef.current = null;
+      }
+    };
+  }, [restTimeRemaining]);
+
+  const loadSession = async () => {
+    try {
+      // In a real app, we'd fetch the session from a workout plan
+      // For now, we'll fetch the plan and find the session
+      const plans = await apiService.getWorkouts();
+      let foundSession: TrainingSession | null = null;
+
+      for (const plan of plans) {
+        const found = plan.trainingSessions.find((s) => s.id === sessionId);
+        if (found) {
+          foundSession = found;
+          break;
+        }
+      }
+
+      if (!foundSession) {
+        Alert.alert('Error', 'Session not found');
+        navigation.goBack();
+        return;
+      }
+
+      setSession(foundSession);
+
+      // Initialize exercise states
+      const states: { [key: string]: ExerciseState } = {};
+      foundSession.exercises.forEach((exercise) => {
+        const sets: SetLog[] = [];
+        for (let i = 1; i <= exercise.targetSets; i++) {
+          sets.push({
+            setNumber: i,
+            reps: '',
+            weight: exercise.targetWeight?.toString() || '',
+            completed: false,
+          });
+        }
+        states[exercise.id] = {
+          exerciseId: exercise.id,
+          expanded: false,
+          sets,
+          allCompleted: false,
+        };
+      });
+      setExerciseStates(states);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to load session');
+      navigation.goBack();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const startSession = async () => {
+    try {
+      const completed = await apiService.startSession(sessionId);
+      setCompletedSessionId(completed.id);
+      setSessionStarted(true);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to start session');
+    }
+  };
+
+  const toggleExercise = (exerciseId: string) => {
+    setExerciseStates((prev) => ({
+      ...prev,
+      [exerciseId]: {
+        ...prev[exerciseId]!,
+        expanded: !prev[exerciseId]!.expanded,
+      },
+    }));
+  };
+
+  const completeSet = async (exerciseId: string, setNumber: number, restSeconds: number) => {
+    if (!sessionStarted) {
+      await startSession();
+    }
+
+    const state = exerciseStates[exerciseId]!;
+    const set = state.sets.find((s) => s.setNumber === setNumber)!;
+
+    // Log set if user entered reps/weight
+    if (completedSessionId && set.reps && set.weight) {
+      try {
+        await apiService.logSet(completedSessionId, {
+          exerciseId,
+          setNumber,
+          actualReps: parseInt(set.reps) || 0,
+          actualWeight: parseFloat(set.weight) || 0,
+        });
+      } catch (error) {
+        console.error('Failed to log set:', error);
+      }
+    }
+
+    // Mark set as completed
+    const updatedSets = state.sets.map((s) =>
+      s.setNumber === setNumber ? { ...s, completed: true } : s
+    );
+
+    const allCompleted = updatedSets.every((s) => s.completed);
+
+    setExerciseStates((prev) => ({
+      ...prev,
+      [exerciseId]: {
+        ...prev[exerciseId]!,
+        sets: updatedSets,
+        allCompleted,
+      },
+    }));
+
+    // Start rest timer
+    if (!allCompleted) {
+      setRestTimeRemaining(restSeconds);
+      setShowRestTimer(true);
+    }
+  };
+
+  const completeAllSets = (exerciseId: string) => {
+    const state = exerciseStates[exerciseId]!;
+    const updatedSets = state.sets.map((s) => ({ ...s, completed: true }));
+
+    setExerciseStates((prev) => ({
+      ...prev,
+      [exerciseId]: {
+        ...prev[exerciseId]!,
+        sets: updatedSets,
+        allCompleted: true,
+      },
+    }));
+  };
+
+  const updateSetValue = (exerciseId: string, setNumber: number, field: 'reps' | 'weight', value: string) => {
+    const state = exerciseStates[exerciseId]!;
+    const updatedSets = state.sets.map((s) =>
+      s.setNumber === setNumber ? { ...s, [field]: value } : s
+    );
+
+    setExerciseStates((prev) => ({
+      ...prev,
+      [exerciseId]: {
+        ...prev[exerciseId]!,
+        sets: updatedSets,
+      },
+    }));
+  };
+
+  const finishWorkout = () => {
+    setShowCompletionModal(true);
+  };
+
+  const saveAndFinish = async () => {
+    if (!completedSessionId) {
+      navigation.goBack();
+      return;
+    }
+
+    setIsCompletingSession(true);
+    try {
+      await apiService.completeSession(completedSessionId, {
+        rating: rating > 0 ? rating : undefined,
+        notes: notes || undefined,
+      });
+
+      Alert.alert('Success', 'Workout completed!', [
+        {
+          text: 'OK',
+          onPress: () => {
+            navigation.navigate('MainTabs');
+          },
+        },
+      ]);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save session');
+    } finally {
+      setIsCompletingSession(false);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const renderExercise = ({ item: exercise }: { item: Exercise }) => {
+    const state = exerciseStates[exercise.id];
+    if (!state) return null;
+
+    return (
+      <View style={styles.exerciseCard}>
+        <TouchableOpacity
+          style={styles.exerciseHeader}
+          onPress={() => toggleExercise(exercise.id)}
+        >
+          <View style={styles.exerciseInfo}>
+            <Text style={styles.exerciseName}>{exercise.name}</Text>
+            <Text style={styles.exerciseTarget}>
+              {exercise.targetSets} sets × {exercise.targetReps} reps
+              {exercise.targetWeight ? ` @ ${exercise.targetWeight}kg` : ''}
+            </Text>
+            {exercise.notes && <Text style={styles.exerciseNotes}>{exercise.notes}</Text>}
+          </View>
+          <View style={[styles.statusBadge, state.allCompleted && styles.statusBadgeCompleted]}>
+            <Text style={[styles.statusText, state.allCompleted && styles.statusTextCompleted]}>
+              {state.allCompleted ? '✓ Done' : `${state.sets.filter(s => s.completed).length}/${exercise.targetSets}`}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {state.expanded && (
+          <View style={styles.setsContainer}>
+            {state.sets.map((set) => (
+              <View key={set.setNumber} style={styles.setRow}>
+                <Text style={styles.setNumber}>Set {set.setNumber}</Text>
+
+                <TextInput
+                  style={styles.setInput}
+                  placeholder="Reps"
+                  keyboardType="numeric"
+                  value={set.reps}
+                  onChangeText={(value) => updateSetValue(exercise.id, set.setNumber, 'reps', value)}
+                  editable={!set.completed}
+                />
+
+                <TextInput
+                  style={styles.setInput}
+                  placeholder="Weight"
+                  keyboardType="numeric"
+                  value={set.weight}
+                  onChangeText={(value) => updateSetValue(exercise.id, set.setNumber, 'weight', value)}
+                  editable={!set.completed}
+                />
+
+                <TouchableOpacity
+                  style={[styles.completeButton, set.completed && styles.completeButtonDone]}
+                  onPress={() => completeSet(exercise.id, set.setNumber, exercise.restSeconds)}
+                  disabled={set.completed}
+                >
+                  <Text style={styles.completeButtonText}>
+                    {set.completed ? '✓' : 'Complete'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+
+            {!state.allCompleted && (
+              <TouchableOpacity
+                style={styles.completeAllButton}
+                onPress={() => completeAllSets(exercise.id)}
+              >
+                <Text style={styles.completeAllButtonText}>Complete All Sets (Quick)</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  if (isLoading || !session) {
+    return (
+      <SafeAreaView style={styles.centerContainer} edges={['bottom']}>
+        <ActivityIndicator size="large" />
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <View style={styles.timerHeader}>
+        <Text style={styles.timerLabel}>Session Time</Text>
+        <Text style={styles.timerValue}>{formatTime(sessionTime)}</Text>
+      </View>
+
+      <FlatList
+        data={session.exercises}
+        renderItem={renderExercise}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+      />
+
+      <TouchableOpacity style={styles.finishButton} onPress={finishWorkout}>
+        <Text style={styles.finishButtonText}>Finish Workout</Text>
+      </TouchableOpacity>
+
+      {/* Rest Timer Modal */}
+      <Modal visible={showRestTimer} transparent={true} animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.restTimerModal}>
+            <Text style={styles.restTimerTitle}>Rest Time</Text>
+            <Text style={styles.restTimerValue}>
+              {Math.floor(restTimeRemaining / 60)}:{(restTimeRemaining % 60).toString().padStart(2, '0')}
+            </Text>
+            <TouchableOpacity
+              style={styles.skipRestButton}
+              onPress={() => {
+                setShowRestTimer(false);
+                setRestTimeRemaining(0);
+              }}
+            >
+              <Text style={styles.skipRestButtonText}>Skip Rest</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Completion Modal */}
+      <Modal visible={showCompletionModal} transparent={true} animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.completionModal}>
+            <ScrollView>
+              <Text style={styles.completionTitle}>Workout Complete!</Text>
+
+              <View style={styles.metricsContainer}>
+                <Text style={styles.metricLabel}>Duration</Text>
+                <Text style={styles.metricValue}>{formatTime(sessionTime)}</Text>
+              </View>
+
+              <Text style={styles.ratingLabel}>Rate Your Workout</Text>
+              <View style={styles.starsContainer}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <TouchableOpacity
+                    key={star}
+                    onPress={() => setRating(star)}
+                    style={styles.starButton}
+                  >
+                    <Text style={[styles.star, rating >= star && styles.starFilled]}>★</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.notesLabel}>Notes (Optional)</Text>
+              <TextInput
+                style={styles.notesInput}
+                placeholder="How did you feel? Any observations?"
+                multiline={true}
+                numberOfLines={4}
+                value={notes}
+                onChangeText={setNotes}
+              />
+
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={saveAndFinish}
+                disabled={isCompletingSession}
+              >
+                {isCompletingSession ? (
+                  <ActivityIndicator color={theme.colors.white} />
+                ) : (
+                  <Text style={styles.saveButtonText}>Save & Finish</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowCompletionModal(false)}
+                disabled={isCompletingSession}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.backgroundSecondary,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  timerHeader: {
+    backgroundColor: theme.colors.primary,
+    padding: theme.spacing.md,
+    alignItems: 'center',
+  },
+  timerLabel: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.white,
+    opacity: theme.opacity.disabled,
+  },
+  timerValue: {
+    fontSize: theme.fontSize.xxxl,
+    fontWeight: theme.fontWeight.bold,
+    color: theme.colors.white,
+  },
+  listContent: {
+    padding: theme.spacing.md,
+    paddingBottom: 100,
+  },
+  exerciseCard: {
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.lg,
+    marginBottom: theme.spacing.sm + theme.spacing.xs,
+    overflow: 'hidden',
+  },
+  exerciseHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: theme.spacing.md,
+  },
+  exerciseInfo: {
+    flex: 1,
+  },
+  exerciseName: {
+    fontSize: theme.fontSize.lg,
+    fontWeight: theme.fontWeight.semibold,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+  },
+  exerciseTarget: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.textSecondary,
+  },
+  exerciseNotes: {
+    fontSize: theme.fontSize.xs,
+    color: theme.colors.textLight,
+    marginTop: theme.spacing.xs,
+    fontStyle: 'italic',
+  },
+  statusBadge: {
+    backgroundColor: theme.colors.borderLight,
+    paddingHorizontal: theme.spacing.sm + theme.spacing.xs,
+    paddingVertical: 6,
+    borderRadius: theme.borderRadius.lg,
+  },
+  statusBadgeCompleted: {
+    backgroundColor: theme.colors.success,
+  },
+  statusText: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.semibold,
+    color: theme.colors.textSecondary,
+  },
+  statusTextCompleted: {
+    color: theme.colors.white,
+  },
+  setsContainer: {
+    padding: theme.spacing.md,
+    paddingTop: 0,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.borderLight,
+  },
+  setRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm + theme.spacing.xs,
+  },
+  setNumber: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.semibold,
+    color: theme.colors.text,
+    width: 50,
+  },
+  setInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.sm,
+    padding: theme.spacing.sm,
+    marginHorizontal: theme.spacing.xs,
+    fontSize: theme.fontSize.sm,
+  },
+  completeButton: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: theme.spacing.sm + theme.spacing.xs,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
+    marginLeft: theme.spacing.xs,
+  },
+  completeButtonDone: {
+    backgroundColor: theme.colors.success,
+  },
+  completeButtonText: {
+    color: theme.colors.white,
+    fontSize: theme.fontSize.xs,
+    fontWeight: theme.fontWeight.semibold,
+  },
+  completeAllButton: {
+    backgroundColor: theme.colors.warning,
+    padding: theme.spacing.sm + theme.spacing.xs,
+    borderRadius: theme.borderRadius.md,
+    alignItems: 'center',
+    marginTop: theme.spacing.sm,
+  },
+  completeAllButtonText: {
+    color: theme.colors.white,
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.semibold,
+  },
+  finishButton: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: theme.colors.success,
+    padding: theme.spacing.md,
+    alignItems: 'center',
+  },
+  finishButtonText: {
+    color: theme.colors.white,
+    fontSize: theme.fontSize.lg,
+    fontWeight: theme.fontWeight.semibold,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: theme.colors.overlay,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  restTimerModal: {
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.xxl,
+    padding: theme.spacing.xl,
+    alignItems: 'center',
+    width: 280,
+  },
+  restTimerTitle: {
+    fontSize: theme.fontSize.xl,
+    fontWeight: theme.fontWeight.semibold,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.md,
+  },
+  restTimerValue: {
+    fontSize: theme.fontSize.display,
+    fontWeight: theme.fontWeight.bold,
+    color: theme.colors.primary,
+    marginBottom: theme.spacing.lg,
+  },
+  skipRestButton: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm + theme.spacing.xs,
+    borderRadius: theme.borderRadius.md,
+  },
+  skipRestButtonText: {
+    color: theme.colors.white,
+    fontSize: theme.fontSize.md,
+    fontWeight: theme.fontWeight.semibold,
+  },
+  completionModal: {
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.xxl,
+    padding: theme.spacing.lg,
+    width: '90%',
+    maxHeight: '80%',
+  },
+  completionTitle: {
+    fontSize: theme.fontSize.xxl,
+    fontWeight: theme.fontWeight.bold,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.lg,
+    textAlign: 'center',
+  },
+  metricsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.backgroundSecondary,
+    borderRadius: theme.borderRadius.lg,
+    marginBottom: theme.spacing.lg,
+  },
+  metricLabel: {
+    fontSize: theme.fontSize.md,
+    color: theme.colors.textSecondary,
+  },
+  metricValue: {
+    fontSize: theme.fontSize.xl,
+    fontWeight: theme.fontWeight.bold,
+    color: theme.colors.text,
+  },
+  ratingLabel: {
+    fontSize: theme.fontSize.md,
+    fontWeight: theme.fontWeight.semibold,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.sm + theme.spacing.xs,
+  },
+  starsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: theme.spacing.lg,
+  },
+  starButton: {
+    padding: theme.spacing.xs,
+  },
+  star: {
+    fontSize: 40,
+    color: theme.colors.border,
+  },
+  starFilled: {
+    color: theme.colors.gold,
+  },
+  notesLabel: {
+    fontSize: theme.fontSize.md,
+    fontWeight: theme.fontWeight.semibold,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.sm,
+  },
+  notesInput: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.sm + theme.spacing.xs,
+    fontSize: theme.fontSize.sm,
+    marginBottom: theme.spacing.lg,
+    textAlignVertical: 'top',
+  },
+  saveButton: {
+    backgroundColor: theme.colors.success,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm + theme.spacing.xs,
+  },
+  saveButtonText: {
+    color: theme.colors.white,
+    fontSize: theme.fontSize.lg,
+    fontWeight: theme.fontWeight.semibold,
+  },
+  cancelButton: {
+    padding: theme.spacing.md,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: theme.colors.textSecondary,
+    fontSize: theme.fontSize.md,
+  },
+});
+
+export default SessionScreen;
