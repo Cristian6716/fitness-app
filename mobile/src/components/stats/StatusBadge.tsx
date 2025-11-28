@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 
 interface StatusBadgeProps {
   text: string;
@@ -8,6 +9,8 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ text, color }: StatusBadgeProps) {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   return (
     <View style={[styles.badge, { backgroundColor: `${color}15` }]}>
       <Text style={[styles.text, { color }]}>{text}</Text>
@@ -15,7 +18,7 @@ export function StatusBadge({ text, color }: StatusBadgeProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   badge: {
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: 4,

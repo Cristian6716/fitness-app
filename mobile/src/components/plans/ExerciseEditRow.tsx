@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 
 interface ExerciseEditRowProps {
   name: string;
@@ -29,6 +30,8 @@ const ExerciseEditRow: React.FC<ExerciseEditRowProps> = ({
   onRestChange,
   onDelete,
 }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   return (
     <View style={styles.container}>
       {/* Exercise name with delete button */}
@@ -107,7 +110,7 @@ const ExerciseEditRow: React.FC<ExerciseEditRowProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     backgroundColor: theme.colors.backgroundTertiary,
     borderRadius: theme.borderRadius.md,
@@ -127,7 +130,7 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.md,
     fontWeight: theme.fontWeight.medium,
     color: theme.colors.text,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderWidth: 1,
     borderColor: theme.colors.primary,
     borderRadius: theme.borderRadius.sm,
@@ -161,7 +164,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeight.medium,
   },
   detailInput: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderWidth: 1,
     borderColor: theme.colors.primary,
     borderRadius: theme.borderRadius.sm,

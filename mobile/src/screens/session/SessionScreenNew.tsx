@@ -18,7 +18,8 @@ import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { TrainingSession } from '../../types/api.types';
 import apiService from '../../services/api.service';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 
 // New Components
 import SessionHeader from '../../components/session/SessionHeader';
@@ -63,6 +64,8 @@ interface PreviousWorkoutData {
 type SessionStatus = 'not_started' | 'in_progress' | 'paused';
 
 const SessionScreen: React.FC<SessionScreenProps> = ({ navigation, route }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const { sessionId } = route.params;
 
   // State
@@ -688,7 +691,7 @@ const SessionScreen: React.FC<SessionScreenProps> = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.backgroundSecondary,
@@ -712,7 +715,7 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
   },
   modalContent: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderRadius: theme.borderRadius.xl,
     padding: theme.spacing.xl,
     width: '100%',
@@ -760,6 +763,7 @@ const styles = StyleSheet.create({
   },
   starIcon: {
     fontSize: 36,
+    color: theme.colors.text,
   },
   saveButton: {
     backgroundColor: theme.colors.success,
@@ -785,7 +789,7 @@ const styles = StyleSheet.create({
 
   // Info Modal
   infoModalContent: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.xl,
     width: '90%',
@@ -799,21 +803,22 @@ const styles = StyleSheet.create({
   },
   infoModalText: {
     fontSize: theme.fontSize.md,
-    color: theme.colors.text,
-    lineHeight: 22,
+    color: theme.colors.textSecondary,
     marginBottom: theme.spacing.lg,
+    lineHeight: 22,
   },
   infoModalButton: {
     backgroundColor: theme.colors.primary,
-    paddingVertical: theme.spacing.sm,
+    paddingVertical: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
     alignItems: 'center',
   },
   infoModalButtonText: {
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.fontWeight.semibold,
     color: theme.colors.white,
+    fontSize: theme.fontSize.md,
+    fontWeight: theme.fontWeight.bold,
   },
 });
+
 
 export default SessionScreen;

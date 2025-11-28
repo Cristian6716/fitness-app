@@ -9,7 +9,8 @@ import {
   Platform,
   UIManager,
 } from 'react-native';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 import ExercisePreviewRow from './ExercisePreviewRow';
 
 // Enable LayoutAnimation on Android
@@ -42,6 +43,8 @@ const SessionAccordionItem: React.FC<SessionAccordionItemProps> = ({
   onToggle,
   onEdit,
 }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const rotateAnim = useRef(new Animated.Value(isExpanded ? 1 : 0)).current;
 
   React.useEffect(() => {
@@ -120,9 +123,9 @@ const SessionAccordionItem: React.FC<SessionAccordionItemProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderRadius: theme.borderRadius.lg,
     marginHorizontal: theme.spacing.md,
     marginBottom: theme.spacing.md,

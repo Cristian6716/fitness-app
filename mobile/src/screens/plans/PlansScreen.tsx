@@ -20,7 +20,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import { MainTabParamList, RootStackParamList } from '../../navigation/AppNavigator';
 import { WorkoutPlan } from '../../types/api.types';
 import apiService from '../../services/api.service';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CustomHeader } from '../../components/CustomHeader';
 
@@ -34,6 +35,8 @@ type PlansScreenProps = {
 };
 
 const PlansScreen: React.FC<PlansScreenProps> = ({ navigation }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const [activeWorkoutPlan, setActiveWorkoutPlan] = useState<WorkoutPlan | null>(null);
   const [archivedPlans, setArchivedPlans] = useState<WorkoutPlan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -460,15 +463,15 @@ const PlansScreen: React.FC<PlansScreenProps> = ({ navigation }) => {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.centerContainer} edges={['bottom']}>
+      <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (!activeWorkoutPlan && archivedPlans.length === 0) {
     return (
-      <SafeAreaView style={styles.container} edges={['bottom']}>
+      <View style={styles.container}>
         <CustomHeader title="I Tuoi Piani" />
 
         <View style={styles.emptyStateContainer}>
@@ -494,12 +497,12 @@ const PlansScreen: React.FC<PlansScreenProps> = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <View style={styles.container}>
       <CustomHeader title="I Tuoi Piani" />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -595,11 +598,11 @@ const PlansScreen: React.FC<PlansScreenProps> = ({ navigation }) => {
           </View>
         </TouchableOpacity>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.backgroundSecondary,
@@ -619,7 +622,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     backgroundColor: theme.colors.background,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
+    borderBottomColor: theme.colors.borderLight,
   },
   headerTitle: {
     fontSize: 28,
@@ -754,7 +757,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderWidth: 1,
     borderColor: theme.colors.border,
     alignItems: 'center',
@@ -774,7 +777,7 @@ const styles = StyleSheet.create({
   // Archived Plans
   archivedCard: {
     width: '100%',
-    backgroundColor: theme.colors.backgroundSecondary,
+    backgroundColor: theme.colors.cardBackground,
     borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.sm + 4,
@@ -806,7 +809,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
     borderRadius: 6,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderWidth: 1,
     borderColor: theme.colors.border,
     alignItems: 'center',
@@ -921,7 +924,7 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingVertical: 14,
     borderRadius: 6,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     alignItems: 'center',
   },
   bottomButtonText: {
@@ -943,7 +946,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   uploadModal: {
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.cardBackground,
     borderRadius: theme.borderRadius.xl,
     padding: theme.spacing.xl,
     alignItems: 'center',
@@ -963,7 +966,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   actionMenu: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingVertical: 8,

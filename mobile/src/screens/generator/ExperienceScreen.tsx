@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 
 type ExperienceScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Experience'>;
@@ -19,6 +20,8 @@ const experienceLevels = [
 ];
 
 const ExperienceScreen: React.FC<ExperienceScreenProps> = ({ navigation, route }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const params = route.params;
   const [selectedExperience, setSelectedExperience] = useState<string | null>(null);
   const [experienceDetails, setExperienceDetails] = useState('');
@@ -38,71 +41,71 @@ const ExperienceScreen: React.FC<ExperienceScreenProps> = ({ navigation, route }
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Livello di Esperienza</Text>
-      <Text style={styles.subtitle}>Da quanto ti alleni? (opzionale)</Text>
+        <Text style={styles.title}>Livello di Esperienza</Text>
+        <Text style={styles.subtitle}>Da quanto ti alleni? (opzionale)</Text>
 
-      <View style={styles.optionsContainer}>
-        {experienceLevels.map((level) => (
-          <TouchableOpacity
-            key={level.id}
-            style={[
-              styles.optionCard,
-              selectedExperience === level.id && styles.optionCardActive,
-            ]}
-            onPress={() => setSelectedExperience(level.id)}
-          >
-            <Text
+        <View style={styles.optionsContainer}>
+          {experienceLevels.map((level) => (
+            <TouchableOpacity
+              key={level.id}
               style={[
-                styles.optionLabel,
-                selectedExperience === level.id && styles.optionLabelActive,
+                styles.optionCard,
+                selectedExperience === level.id && styles.optionCardActive,
               ]}
+              onPress={() => setSelectedExperience(level.id)}
             >
-              {level.label}
-            </Text>
-            <Text
-              style={[
-                styles.optionDescription,
-                selectedExperience === level.id && styles.optionDescriptionActive,
-              ]}
-            >
-              {level.description}
-            </Text>
+              <Text
+                style={[
+                  styles.optionLabel,
+                  selectedExperience === level.id && styles.optionLabelActive,
+                ]}
+              >
+                {level.label}
+              </Text>
+              <Text
+                style={[
+                  styles.optionDescription,
+                  selectedExperience === level.id && styles.optionDescriptionActive,
+                ]}
+              >
+                {level.description}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.sectionLabel}>Esperienza specifica (opzionale)</Text>
+        <TextInput
+          style={styles.textArea}
+          placeholder="Es: conosco bene squat e stacco"
+          value={experienceDetails}
+          onChangeText={setExperienceDetails}
+          multiline
+          numberOfLines={2}
+          textAlignVertical="top"
+        />
+
+        <Text style={styles.helper}>
+          Questa domanda è opzionale. Se non rispondi, l'AI adatterà il programma in base alle altre informazioni.
+        </Text>
+
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Text style={styles.backButtonText}>Indietro</Text>
           </TouchableOpacity>
-        ))}
-      </View>
-
-      <Text style={styles.sectionLabel}>Esperienza specifica (opzionale)</Text>
-      <TextInput
-        style={styles.textArea}
-        placeholder="Es: conosco bene squat e stacco"
-        value={experienceDetails}
-        onChangeText={setExperienceDetails}
-        multiline
-        numberOfLines={2}
-        textAlignVertical="top"
-      />
-
-      <Text style={styles.helper}>
-        Questa domanda è opzionale. Se non rispondi, l'AI adatterà il programma in base alle altre informazioni.
-      </Text>
-
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backButtonText}>Indietro</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-          <Text style={styles.skipButtonText}>Salta</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={handleNext}>
-          <Text style={styles.buttonText}>Continua</Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+            <Text style={styles.skipButtonText}>Salta</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.button} onPress={handleNext}>
+            <Text style={styles.buttonText}>Continua</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -166,6 +169,7 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.md,
     minHeight: 60,
     marginBottom: theme.spacing.md,
+    color: theme.colors.text,
   },
   helper: {
     fontSize: theme.fontSize.sm,
@@ -191,7 +195,7 @@ const styles = StyleSheet.create({
   },
   skipButton: {
     flex: 1,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     padding: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
     alignItems: 'center',

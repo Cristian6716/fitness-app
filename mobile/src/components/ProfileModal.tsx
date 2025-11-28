@@ -2,7 +2,8 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
-import { theme } from '../constants/theme';
+import { useTheme } from '../contexts/ThemeContext';
+import { Theme } from '../constants/theme';
 
 interface ProfileModalProps {
   visible: boolean;
@@ -10,6 +11,8 @@ interface ProfileModalProps {
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({ visible, onClose }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const { user, logout } = useAuth();
 
   console.log('ProfileModal - User data:', user);
@@ -92,7 +95,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ visible, onClose }) 
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',

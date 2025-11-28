@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 
 type EquipmentScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Equipment'>;
@@ -21,6 +22,8 @@ const equipmentOptions = [
 ];
 
 const EquipmentScreen: React.FC<EquipmentScreenProps> = ({ navigation, route }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const { personalInfo, goal, goalDetails, daysPerWeek, sessionDuration, scheduleNotes } = route.params;
   const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
   const [equipmentDetails, setEquipmentDetails] = useState('');
@@ -62,69 +65,69 @@ const EquipmentScreen: React.FC<EquipmentScreenProps> = ({ navigation, route }) 
         >
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View>
-        <Text style={styles.title}>Dove ti alleni?</Text>
-        <Text style={styles.subtitle}>Seleziona tutto ciò che hai (selezione multipla)</Text>
+              <Text style={styles.title}>Dove ti alleni?</Text>
+              <Text style={styles.subtitle}>Seleziona tutto ciò che hai (selezione multipla)</Text>
 
-        <View style={styles.optionsContainer}>
-          {equipmentOptions.map((equipment) => (
-            <TouchableOpacity
-              key={equipment.id}
-              style={[
-                styles.optionCard,
-                selectedEquipment.includes(equipment.id) && styles.optionCardActive,
-              ]}
-              onPress={() => toggleEquipment(equipment.id)}
-            >
-              <View style={styles.checkbox}>
-                {selectedEquipment.includes(equipment.id) && <View style={styles.checkboxInner} />}
+              <View style={styles.optionsContainer}>
+                {equipmentOptions.map((equipment) => (
+                  <TouchableOpacity
+                    key={equipment.id}
+                    style={[
+                      styles.optionCard,
+                      selectedEquipment.includes(equipment.id) && styles.optionCardActive,
+                    ]}
+                    onPress={() => toggleEquipment(equipment.id)}
+                  >
+                    <View style={styles.checkbox}>
+                      {selectedEquipment.includes(equipment.id) && <View style={styles.checkboxInner} />}
+                    </View>
+                    <Text
+                      style={[
+                        styles.optionLabel,
+                        selectedEquipment.includes(equipment.id) && styles.optionLabelActive,
+                      ]}
+                    >
+                      {equipment.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-              <Text
-                style={[
-                  styles.optionLabel,
-                  selectedEquipment.includes(equipment.id) && styles.optionLabelActive,
-                ]}
-              >
-                {equipment.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
 
-        <Text style={styles.sectionLabel}>Attrezzatura specifica (opzionale)</Text>
-        <TextInput
-          style={styles.textArea}
-          placeholder="Es: ho leg press ma no hack squat"
-          value={equipmentDetails}
-          onChangeText={setEquipmentDetails}
-          multiline
-          numberOfLines={2}
-          textAlignVertical="top"
-        />
-          </View>
-        </TouchableWithoutFeedback>
-      </ScrollView>
+              <Text style={styles.sectionLabel}>Attrezzatura specifica (opzionale)</Text>
+              <TextInput
+                style={styles.textArea}
+                placeholder="Es: ho leg press ma no hack squat"
+                value={equipmentDetails}
+                onChangeText={setEquipmentDetails}
+                multiline
+                numberOfLines={2}
+                textAlignVertical="top"
+              />
+            </View>
+          </TouchableWithoutFeedback>
+        </ScrollView>
 
         <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>Indietro</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, selectedEquipment.length === 0 && styles.buttonDisabled]}
-          onPress={handleNext}
-          disabled={selectedEquipment.length === 0}
-        >
-          <Text style={styles.buttonText}>Continua</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>Indietro</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, selectedEquipment.length === 0 && styles.buttonDisabled]}
+            onPress={handleNext}
+            disabled={selectedEquipment.length === 0}
+          >
+            <Text style={styles.buttonText}>Continua</Text>
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -163,6 +166,7 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.md,
     minHeight: 60,
     marginBottom: theme.spacing.md,
+    color: theme.colors.text,
   },
   optionsContainer: {
     marginBottom: theme.spacing.md,

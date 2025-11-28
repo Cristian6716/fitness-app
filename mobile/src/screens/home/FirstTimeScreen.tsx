@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../navigation/AppNavigator';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 
 type FirstTimeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'FirstTime'>;
 
@@ -13,6 +14,8 @@ type FirstTimeScreenProps = {
 };
 
 const FirstTimeScreen: React.FC<FirstTimeScreenProps> = ({ navigation }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -67,7 +70,7 @@ const FirstTimeScreen: React.FC<FirstTimeScreenProps> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -98,7 +101,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing.lg,
   },
   card: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderRadius: theme.borderRadius.xl,
     padding: theme.spacing.xl,
     alignItems: 'center',
@@ -112,7 +115,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: theme.colors.primaryLight,
+    backgroundColor: `${theme.colors.primary}15`,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: theme.spacing.md,

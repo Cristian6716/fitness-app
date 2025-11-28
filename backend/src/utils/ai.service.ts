@@ -126,6 +126,10 @@ PRINCIPIANTI:
 - Fornisci alternative più semplici quando necessario
 - Spiega come capire quando è il momento di aumentare i pesos
 
+DETTAGLI TECNICI:
+- Per ogni esercizio, fornisci istruzioni tecniche precise, consigli sul sovraccarico progressivo e avvertenze fisiche.
+- Sii professionale ma chiaro.
+
 LIVELLI AVANZATI:
 - Se intermedio/avanzato: usa tecniche avanzate (dropset, superset, rest-pause) quando appropriato
 - Suggerisci range di reps e carichi più specifici
@@ -162,13 +166,17 @@ Return ONLY a valid JSON object with this exact structure:
       "dayNumber": 1,
       "order": 1,
       "exercises": [
+      "exercises": [
         {
           "name": "Nome esercizio in italiano",
           "targetSets": 3,
           "targetReps": "8-10",
           "targetWeight": null o numero in kg,
           "restSeconds": 90,
-          "notes": "Note tecniche o consigli sui carichi in italiano",
+          "notes": "Note brevi",
+          "technicalInstructions": "Spiegazione dettagliata su come eseguire l'esercizio correttamente (posizione, movimento, respirazione)",
+          "progressiveOverloadTips": "Come aumentare l'intensità nel tempo (es: aumenta peso, riduci recupero)",
+          "physicalCautions": "A cosa fare attenzione per evitare infortuni",
           "order": 1
         }
       ]

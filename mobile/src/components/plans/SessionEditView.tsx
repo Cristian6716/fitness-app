@@ -8,7 +8,8 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 import ExerciseEditRow from './ExerciseEditRow';
 
 interface Exercise {
@@ -48,6 +49,8 @@ const SessionEditView: React.FC<SessionEditViewProps> = ({
   onFinish,
   onCancel,
 }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const handleDeleteSession = () => {
     Alert.alert(
       'Elimina Sessione',
@@ -172,7 +175,7 @@ const SessionEditView: React.FC<SessionEditViewProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.backgroundSecondary,
@@ -182,7 +185,7 @@ const styles = StyleSheet.create({
     paddingBottom: 80, // Extra space for Android nav bar
   },
   headerCard: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.md,
@@ -215,7 +218,7 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.lg,
     fontWeight: theme.fontWeight.semibold,
     color: theme.colors.text,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderWidth: 1,
     borderColor: theme.colors.primary,
     borderRadius: theme.borderRadius.md,

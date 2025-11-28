@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 
 type LimitationsScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Limitations'>;
@@ -12,6 +13,8 @@ type LimitationsScreenProps = {
 };
 
 const LimitationsScreen: React.FC<LimitationsScreenProps> = ({ navigation, route }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const params = route.params;
   const [hasLimitations, setHasLimitations] = useState<'yes' | 'no' | 'prefer_not' | null>(null);
   const [limitations, setLimitations] = useState('');
@@ -30,72 +33,72 @@ const LimitationsScreen: React.FC<LimitationsScreenProps> = ({ navigation, route
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Limitazioni Fisiche</Text>
-      <Text style={styles.subtitle}>Hai infortuni o limitazioni fisiche? (opzionale)</Text>
+        <Text style={styles.title}>Limitazioni Fisiche</Text>
+        <Text style={styles.subtitle}>Hai infortuni o limitazioni fisiche? (opzionale)</Text>
 
-      <View style={styles.optionsContainer}>
-        <TouchableOpacity
-          style={[styles.optionButton, hasLimitations === 'yes' && styles.optionButtonActive]}
-          onPress={() => setHasLimitations('yes')}
-        >
-          <Text style={[styles.optionText, hasLimitations === 'yes' && styles.optionTextActive]}>
-            Sì
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.optionButton, hasLimitations === 'no' && styles.optionButtonActive]}
-          onPress={() => setHasLimitations('no')}
-        >
-          <Text style={[styles.optionText, hasLimitations === 'no' && styles.optionTextActive]}>
-            No
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.optionButton, hasLimitations === 'prefer_not' && styles.optionButtonActive]}
-          onPress={() => setHasLimitations('prefer_not')}
-        >
-          <Text style={[styles.optionText, hasLimitations === 'prefer_not' && styles.optionTextActive]}>
-            Preferisco non rispondere
-          </Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.optionsContainer}>
+          <TouchableOpacity
+            style={[styles.optionButton, hasLimitations === 'yes' && styles.optionButtonActive]}
+            onPress={() => setHasLimitations('yes')}
+          >
+            <Text style={[styles.optionText, hasLimitations === 'yes' && styles.optionTextActive]}>
+              Sì
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.optionButton, hasLimitations === 'no' && styles.optionButtonActive]}
+            onPress={() => setHasLimitations('no')}
+          >
+            <Text style={[styles.optionText, hasLimitations === 'no' && styles.optionTextActive]}>
+              No
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.optionButton, hasLimitations === 'prefer_not' && styles.optionButtonActive]}
+            onPress={() => setHasLimitations('prefer_not')}
+          >
+            <Text style={[styles.optionText, hasLimitations === 'prefer_not' && styles.optionTextActive]}>
+              Preferisco non rispondere
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-      {hasLimitations === 'yes' && (
-        <>
-          <Text style={styles.sectionLabel}>Descrivi le tue limitazioni</Text>
-          <TextInput
-            style={styles.textArea}
-            placeholder="Es: dolore spalla destra, evito military press"
-            value={limitations}
-            onChangeText={setLimitations}
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-          />
-        </>
-      )}
+        {hasLimitations === 'yes' && (
+          <>
+            <Text style={styles.sectionLabel}>Descrivi le tue limitazioni</Text>
+            <TextInput
+              style={styles.textArea}
+              placeholder="Es: dolore spalla destra, evito military press"
+              value={limitations}
+              onChangeText={setLimitations}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+          </>
+        )}
 
-      <Text style={styles.helper}>
-        Questa informazione ci aiuterà a creare un programma sicuro per te.
-      </Text>
+        <Text style={styles.helper}>
+          Questa informazione ci aiuterà a creare un programma sicuro per te.
+        </Text>
 
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backButtonText}>Indietro</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-          <Text style={styles.skipButtonText}>Salta</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={handleNext}>
-          <Text style={styles.buttonText}>Continua</Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Text style={styles.backButtonText}>Indietro</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+            <Text style={styles.skipButtonText}>Salta</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.button} onPress={handleNext}>
+            <Text style={styles.buttonText}>Continua</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -157,6 +160,7 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.md,
     minHeight: 100,
     marginBottom: theme.spacing.md,
+    color: theme.colors.text,
   },
   helper: {
     fontSize: theme.fontSize.sm,
@@ -182,7 +186,7 @@ const styles = StyleSheet.create({
   },
   skipButton: {
     flex: 1,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     padding: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
     alignItems: 'center',

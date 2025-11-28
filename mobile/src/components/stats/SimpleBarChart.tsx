@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Rect, Text as SvgText, Line } from 'react-native-svg';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 import { WeeklyVolumeData } from '../../types/api.types';
 
 interface SimpleBarChartProps {
@@ -10,6 +11,8 @@ interface SimpleBarChartProps {
 }
 
 export function SimpleBarChart({ data, currentWeekVolume }: SimpleBarChartProps) {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   // Handle empty data
   if (data.length === 0 || data.every((item) => item.volume === 0)) {
     return (
@@ -110,7 +113,7 @@ export function SimpleBarChart({ data, currentWeekVolume }: SimpleBarChartProps)
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     backgroundColor: theme.colors.background,
     marginHorizontal: theme.spacing.md,

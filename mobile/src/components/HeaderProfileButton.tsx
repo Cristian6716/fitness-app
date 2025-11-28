@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
-import { ProfileModal } from './ProfileModal';
-import { theme } from '../constants/theme';
+import { useTheme } from '../contexts/ThemeContext';
+import { Theme } from '../constants/theme';
 
 export const HeaderProfileButton: React.FC = () => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const { user } = useAuth();
-  const [modalVisible, setModalVisible] = useState(false);
+  const navigation = useNavigation<any>();
 
   const getInitials = () => {
     if (!user?.email) return '?';
@@ -17,30 +20,23 @@ export const HeaderProfileButton: React.FC = () => {
   };
 
   return (
-    <>
-      <TouchableOpacity
-        activeOpacity={0.9}
-        onPress={() => setModalVisible(true)}
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPress={() => navigation.navigate('Profile')}
+    >
+      <LinearGradient
+        colors={theme.colors.gradientPrimary as any}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.button}
       >
-        <LinearGradient
-          colors={theme.colors.gradientPrimary as any}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.button}
-        >
-          <Text style={styles.initials}>{getInitials()}</Text>
-        </LinearGradient>
-      </TouchableOpacity>
-
-      <ProfileModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-      />
-    </>
+        <Text style={styles.initials}>{getInitials()}</Text>
+      </LinearGradient>
+    </TouchableOpacity>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   button: {
     width: 40,
     height: 40,

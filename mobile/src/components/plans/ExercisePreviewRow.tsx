@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 
 interface ExercisePreviewRowProps {
   name: string;
@@ -17,6 +18,8 @@ const ExercisePreviewRow: React.FC<ExercisePreviewRowProps> = ({
   weight,
   restSeconds,
 }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const buildInfoText = () => {
     const parts: string[] = [];
     parts.push(`${sets} serie`);
@@ -34,7 +37,7 @@ const ExercisePreviewRow: React.FC<ExercisePreviewRowProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     paddingVertical: theme.spacing.sm,
     borderBottomWidth: 1,

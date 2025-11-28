@@ -16,12 +16,15 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { TrainingSession } from '../../types/api.types';
 import apiService from '../../services/api.service';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
+import ExerciseCardFocused from '../../components/session/ExerciseCardFocused';
 
 type SessionScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Session'>;
@@ -46,6 +49,9 @@ interface ExerciseState {
   notesExpanded: boolean;
   animatedValues: Animated.Value[]; // Animation value per set
   isExpanded: boolean; // NEW: for collapse/expand functionality
+  technicalInstructions?: string;
+  progressiveOverloadTips?: string;
+  physicalCautions?: string;
 }
 
 interface ActiveRestTimer {
@@ -57,6 +63,8 @@ interface ActiveRestTimer {
 type SessionStatus = 'not_started' | 'in_progress' | 'paused';
 
 const SessionScreen: React.FC<SessionScreenProps> = ({ navigation, route }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const { sessionId } = route.params;
   const insets = useSafeAreaInsets();
 
@@ -72,6 +80,10 @@ const SessionScreen: React.FC<SessionScreenProps> = ({ navigation, route }) => {
   const [rating, setRating] = useState(0);
   const [completionNotes, setCompletionNotes] = useState('');
   const [isCompletingSession, setIsCompletingSession] = useState(false);
+  const [motivationalMessage] = useState(() => {
+    const messages = ['Grande lavoro!', 'Sei una macchina!', 'Ottima sessione!', 'Fantastico!', 'Continua così!'];
+    return messages[Math.floor(Math.random() * messages.length)];
+  });
 
   // Info modal state
   const [showInfoModal, setShowInfoModal] = useState(false);
@@ -83,6 +95,8 @@ const SessionScreen: React.FC<SessionScreenProps> = ({ navigation, route }) => {
 
   const sessionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const restTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const notesInputRef = useRef<TextInput>(null);
+  const victoryScrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     loadSession();
@@ -179,6 +193,9 @@ const SessionScreen: React.FC<SessionScreenProps> = ({ navigation, route }) => {
           notesExpanded: false,
           animatedValues,
           isExpanded: index === 0, // First exercise expanded by default
+          technicalInstructions: (exercise as any).technicalInstructions,
+          progressiveOverloadTips: (exercise as any).progressiveOverloadTips,
+          physicalCautions: (exercise as any).physicalCautions,
         };
       });
 
@@ -264,7 +281,7 @@ const SessionScreen: React.FC<SessionScreenProps> = ({ navigation, route }) => {
 
       // Stop rest timer if this is the active resting set
       if (activeRestTimer?.exerciseId === exercise.exerciseId &&
-          activeRestTimer?.setNumber === set.setNumber) {
+        activeRestTimer?.setNumber === set.setNumber) {
         if (restTimerRef.current) {
           clearInterval(restTimerRef.current);
           restTimerRef.current = null;
@@ -278,6 +295,11 @@ const SessionScreen: React.FC<SessionScreenProps> = ({ navigation, route }) => {
         Vibration.vibrate(30);
       }
       return;
+    }
+
+    // AUTO-START: If session hasn't started yet, start it automatically
+    if (sessionStatus === 'not_started') {
+      startSessionTimer();
     }
 
     // Start backend session if not started
@@ -431,6 +453,127 @@ const SessionScreen: React.FC<SessionScreenProps> = ({ navigation, route }) => {
     }
   };
 
+  // NEW: Handlers for ExerciseCardFocused
+  const handleSetUncomplete = (exerciseIndex: number, setNumber: number) => {
+    const updatedExercises = [...exercises];
+    const setIndex = updatedExercises[exerciseIndex].sets.findIndex(s => s.setNumber === setNumber);
+
+    if (setIndex !== -1) {
+      updatedExercises[exerciseIndex].sets[setIndex].completed = false;
+
+      // Reset animation
+      Animated.timing(updatedExercises[exerciseIndex].animatedValues[setIndex], {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
+
+      setExercises(updatedExercises);
+
+      // Stop rest timer if active for this set
+      if (activeRestTimer?.exerciseId === updatedExercises[exerciseIndex].exerciseId &&
+        activeRestTimer?.setNumber === setNumber) {
+        setActiveRestTimer(null);
+      }
+
+      Vibration.vibrate(50);
+    }
+  };
+
+  const handleAddSet = (exerciseIndex: number) => {
+    const updatedExercises = [...exercises];
+    const exercise = updatedExercises[exerciseIndex];
+    const lastSet = exercise.sets[exercise.sets.length - 1];
+
+    const newSetNumber = lastSet.setNumber + 1;
+    exercise.sets.push({
+      setNumber: newSetNumber,
+      targetReps: lastSet.targetReps,
+      targetWeight: lastSet.targetWeight,
+      completed: false,
+    });
+
+    exercise.animatedValues.push(new Animated.Value(0));
+
+    setExercises(updatedExercises);
+    Vibration.vibrate(20);
+  };
+
+  const handleDeleteSet = (exerciseIndex: number, setNumber: number) => {
+    const updatedExercises = [...exercises];
+    const exercise = updatedExercises[exerciseIndex];
+
+    if (exercise.sets.length <= 1) {
+      Alert.alert('Impossibile Eliminare', 'Devi avere almeno un set per esercizio.');
+      return;
+    }
+
+    const setIndex = exercise.sets.findIndex(s => s.setNumber === setNumber);
+    if (setIndex !== -1) {
+      exercise.sets.splice(setIndex, 1);
+      exercise.animatedValues.splice(setIndex, 1);
+
+      // Renumber remaining sets
+      exercise.sets.forEach((set, idx) => {
+        set.setNumber = idx + 1;
+      });
+
+      setExercises(updatedExercises);
+    }
+  };
+
+  const handleDuplicateSet = (exerciseIndex: number, setNumber: number) => {
+    const updatedExercises = [...exercises];
+    const exercise = updatedExercises[exerciseIndex];
+    const setIndex = exercise.sets.findIndex(s => s.setNumber === setNumber);
+
+    if (setIndex !== -1) {
+      const setToDuplicate = exercise.sets[setIndex];
+      const newSet = {
+        ...setToDuplicate,
+        setNumber: setIndex + 2,
+        completed: false,
+        actualReps: undefined,
+        actualWeight: undefined,
+      };
+
+      exercise.sets.splice(setIndex + 1, 0, newSet);
+      exercise.animatedValues.splice(setIndex + 1, 0, new Animated.Value(0));
+
+      // Renumber remaining sets
+      for (let i = setIndex + 2; i < exercise.sets.length; i++) {
+        exercise.sets[i].setNumber = i + 1;
+      }
+
+      setExercises(updatedExercises);
+    }
+  };
+
+  const handleShowExerciseInfo = (exerciseIndex: number) => {
+    setSelectedExerciseInfo(exercises[exerciseIndex]);
+    setShowInfoModal(true);
+  };
+
+  // Focus Mode: Determine which exercise is active
+  const getActiveExerciseIndex = useMemo(() => {
+    return exercises.findIndex(ex => ex.sets.some(s => !s.completed));
+  }, [exercises]);
+
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  // Auto-scroll to active exercise when it changes
+  useEffect(() => {
+    if (getActiveExerciseIndex >= 0 && scrollViewRef.current) {
+      // Delay to ensure layout is complete
+      setTimeout(() => {
+        scrollViewRef.current?.scrollTo({
+          y: getActiveExerciseIndex * 200, // Approximate card height
+          animated: true,
+        });
+      }, 300);
+    }
+  }, [getActiveExerciseIndex]);
+
   const calculateProgress = () => {
     const totalSets = exercises.reduce((sum, ex) => sum + ex.sets.length, 0);
     const completedSets = exercises.reduce(
@@ -488,9 +631,41 @@ const SessionScreen: React.FC<SessionScreenProps> = ({ navigation, route }) => {
       return;
     }
 
+    // Check if user wants to add notes (only if they haven't added any)
+    if (!completionNotes.trim()) {
+      Alert.alert(
+        'Vuoi aggiungere delle note?',
+        'Puoi aggiungere note sulla sessione per tracciare i tuoi progressi.',
+        [
+          {
+            text: 'Salta',
+            style: 'cancel',
+            onPress: () => completeSessionNow(),
+          },
+          {
+            text: 'Aggiungi Note',
+            onPress: () => {
+              // Scroll to notes section and focus input
+              setTimeout(() => {
+                victoryScrollViewRef.current?.scrollToEnd({ animated: true });
+                setTimeout(() => {
+                  notesInputRef.current?.focus();
+                }, 300);
+              }, 100);
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    completeSessionNow();
+  };
+
+  const completeSessionNow = async () => {
     setIsCompletingSession(true);
     try {
-      await apiService.completeSession(completedSessionId, {
+      await apiService.completeSession(completedSessionId!, {
         rating: rating > 0 ? rating : undefined,
         notes: completionNotes || undefined,
       });
@@ -523,11 +698,6 @@ const SessionScreen: React.FC<SessionScreenProps> = ({ navigation, route }) => {
     if (Platform.OS === 'ios' || Platform.OS === 'android') {
       Vibration.vibrate(30);
     }
-  };
-
-  const handleShowExerciseInfo = (exerciseIndex: number) => {
-    setSelectedExerciseInfo(exercises[exerciseIndex]);
-    setShowInfoModal(true);
   };
 
   const handleEditSession = () => {
@@ -678,6 +848,31 @@ const SessionScreen: React.FC<SessionScreenProps> = ({ navigation, route }) => {
   const progress = useMemo(() => calculateProgress(), [exercises]);
   const stats = useMemo(() => calculateStats(), [exercises, elapsedSeconds]);
 
+  // Configure navigation header - MUST be before early return (Rules of Hooks)
+  useEffect(() => {
+    navigation.setOptions({
+      headerTitle: activeRestTimer
+        ? () => (
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTimerText}>
+              {formatTime(activeRestTimer.secondsLeft)}
+            </Text>
+          </View>
+        )
+        : '',
+      headerLeft: activeRestTimer
+        ? () => <View style={{ width: 80 }} />
+        : undefined,
+      headerRight: activeRestTimer
+        ? () => (
+          <TouchableOpacity onPress={skipRestTimer} style={styles.headerSkipButtonNav}>
+            <Text style={styles.headerSkipText}>Salta</Text>
+          </TouchableOpacity>
+        )
+        : undefined,
+    });
+  }, [navigation, activeRestTimer, skipRestTimer, formatTime]);
+
   if (isLoading || !session) {
     return (
       <SafeAreaView style={styles.centerContainer} edges={['top', 'bottom']}>
@@ -688,320 +883,183 @@ const SessionScreen: React.FC<SessionScreenProps> = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* REST TIMER BANNER (only when active) */}
-      {activeRestTimer && (
-        <LinearGradient
-          colors={theme.colors.gradientPrimary as any}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.restTimerBanner}
-        >
-          <Text style={styles.restTimerText}>
-            Riposo: {formatTime(activeRestTimer.secondsLeft)}
-          </Text>
-          <TouchableOpacity onPress={skipRestTimer} style={styles.skipButton}>
-            <Text style={styles.skipButtonText}>×</Text>
-          </TouchableOpacity>
-        </LinearGradient>
-      )}
-
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           {exercises.map((exercise, exerciseIndex) => {
-            const completedSets = exercise.sets.filter(s => s.completed).length;
-            const totalSets = exercise.sets.length;
-            const activeSetIndex = exercise.sets.findIndex(s => !s.completed);
+            const isFocused = exerciseIndex === getActiveExerciseIndex;
 
             return (
-            <View key={exercise.exerciseId} style={styles.exerciseCard}>
-              {/* CARD HEADER */}
-              <TouchableOpacity
-                style={styles.exerciseCardHeader}
-                onPress={() => toggleExerciseExpand(exerciseIndex)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.chevronIcon}>
-                  {exercise.isExpanded ? '▼' : '▶'}
-                </Text>
-                <View style={styles.exerciseHeaderContent}>
-                  <Text style={styles.exerciseName}>{exercise.name}</Text>
-                  {!exercise.isExpanded && (
-                    <Text style={styles.exerciseProgress}>
-                      {completedSets}/{totalSets} set completati
-                    </Text>
-                  )}
-                </View>
-                <Text style={styles.exerciseIcon}>🏋️</Text>
-              </TouchableOpacity>
-
-              {/* CARD CONTENT (EXPANDED) */}
-              {exercise.isExpanded && (
-                <Animated.View style={styles.exerciseCardContent}>
-
-              <View style={styles.tableHeader}>
-                <View style={styles.setColumn}>
-                  <Text style={styles.headerText}>SET</Text>
-                </View>
-
-                <View style={styles.targetColumn}>
-                  <Text style={styles.headerText}>TARGET</Text>
-                  <View style={styles.targetSubColumns}>
-                    <Text style={styles.subHeaderText}>REPS</Text>
-                    <Text style={styles.subHeaderText}>KG</Text>
-                  </View>
-                </View>
-
-                <View style={styles.completedColumn}>
-                  <Text style={styles.headerText}>COMPLETATO</Text>
-                  <View style={styles.completedSubColumns}>
-                    <Text style={styles.subHeaderText}>REPS</Text>
-                    <Text style={styles.subHeaderText}>KG</Text>
-                  </View>
-                </View>
-
-                <View style={styles.checkboxColumn}>
-                  <Text style={styles.headerText}> </Text>
-                </View>
-              </View>
-
-              {exercise.sets.map((set, setIndex) => {
-                const isActiveSet = setIndex === activeSetIndex;
-                const isCompleted = set.completed;
-
-                return (
-                  <View
-                    key={setIndex}
-                    style={[
-                      styles.setRow,
-                      isActiveSet && styles.activeSetRow,
-                      isCompleted && styles.completedSetRow,
-                    ]}
-                  >
-                    {/* Active Set Indicator */}
-                    {isActiveSet && <View style={styles.activeSetIndicator} />}
-
-                    {/* Set Number */}
-                    <View style={styles.setColumn}>
-                      <Text style={styles.setNumber}>{set.setNumber}</Text>
-                    </View>
-
-                    {/* Target */}
-                    <View style={styles.targetColumn}>
-                      <View style={styles.targetValues}>
-                        <Text style={styles.targetText}>{set.targetReps}</Text>
-                        <Text style={styles.targetText}>{set.targetWeight}kg</Text>
-                      </View>
-                    </View>
-
-                    {/* Completed Inputs */}
-                    <View style={styles.completedColumn}>
-                      <View style={styles.completedInputs}>
-                        <TextInput
-                          style={[
-                            styles.setInput,
-                            isCompleted && styles.setInputCompleted,
-                          ]}
-                          placeholder=""
-                          placeholderTextColor={theme.colors.textLight}
-                          keyboardType="numeric"
-                          value={set.actualReps?.toString() || ''}
-                          onChangeText={(value) =>
-                            handleInputChange(exerciseIndex, setIndex, 'actualReps', value)
-                          }
-                          editable={!isCompleted}
-                        />
-
-                        <TextInput
-                          style={[
-                            styles.setInput,
-                            isCompleted && styles.setInputCompleted,
-                          ]}
-                          placeholder=""
-                          placeholderTextColor={theme.colors.textLight}
-                          keyboardType="decimal-pad"
-                          value={set.actualWeight?.toString() || ''}
-                          onChangeText={(value) =>
-                            handleInputChange(exerciseIndex, setIndex, 'actualWeight', value)
-                          }
-                          editable={!isCompleted}
-                        />
-                      </View>
-                    </View>
-
-                    {/* Checkbox */}
-                    <View style={styles.checkboxColumn}>
-                      <TouchableOpacity
-                        style={[
-                          styles.setCheckbox,
-                          isCompleted && styles.setCheckboxCompleted,
-                        ]}
-                        onPress={() => handleSetComplete(exerciseIndex, setIndex)}
-                      >
-                        <Text style={[
-                          styles.checkmark,
-                          !isCompleted && styles.checkmarkUncompleted
-                        ]}>✓</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                );
-              })}
-
-              <TouchableOpacity
-                style={styles.notesToggle}
-                onPress={() => toggleExerciseNotes(exerciseIndex)}
-              >
-                <Text style={styles.notesToggleText}>💬 Note (opzionale)</Text>
-                <Text style={styles.notesToggleIcon}>
-                  {exercise.notesExpanded ? '▼' : '▶'}
-                </Text>
-              </TouchableOpacity>
-
-              {exercise.notesExpanded && (
-                <TextInput
-                  style={styles.notesInput}
-                  placeholder="Aggiungi note su questo esercizio..."
-                  placeholderTextColor={theme.colors.textLight}
-                  multiline
-                  numberOfLines={3}
-                  value={exercise.notes}
-                  onChangeText={(text) => updateExerciseNotes(exerciseIndex, text)}
-                />
-              )}
-
-              <TouchableOpacity
-                style={styles.addSetButton}
-                onPress={() => addSet(exerciseIndex)}
-              >
-                <Text style={styles.addSetButtonText}>+ Aggiungi Set</Text>
-              </TouchableOpacity>
-                </Animated.View>
-              )}
-            </View>
-          );
+              <ExerciseCardFocused
+                key={exercise.exerciseId}
+                exerciseId={exercise.exerciseId}
+                name={exercise.name}
+                sets={exercise.sets}
+                restSeconds={exercise.restSeconds}
+                notes={exercise.notes}
+                isExpanded={exercise.isExpanded}
+                isFocused={isFocused}
+                onToggleExpand={() => toggleExerciseExpand(exerciseIndex)}
+                onSetComplete={(setNumber) => handleSetComplete(exerciseIndex, exercise.sets.findIndex(s => s.setNumber === setNumber))}
+                onSetUncomplete={(setNumber) => handleSetUncomplete(exerciseIndex, setNumber)}
+                onUpdateSet={(setNumber, field, value) => {
+                  const setIndex = exercise.sets.findIndex(s => s.setNumber === setNumber);
+                  handleInputChange(exerciseIndex, setIndex, field, value.toString());
+                }}
+                onAddSet={() => handleAddSet(exerciseIndex)}
+                onDeleteSet={(setNumber) => handleDeleteSet(exerciseIndex, setNumber)}
+                onDuplicateSet={(setNumber) => handleDuplicateSet(exerciseIndex, setNumber)}
+                onShowInfo={() => handleShowExerciseInfo(exerciseIndex)}
+                previousWorkoutData={[]}
+              />
+            );
           })}
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* BOTTOM CONTROLS - ALWAYS SIDE BY SIDE */}
-      <View style={[styles.bottomControls, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-        <View style={styles.bottomButtonsContainer}>
-          {/* LEFT SIDE: Session Timer or Start Button */}
-          <View style={styles.leftBottomButton}>
-            {sessionStatus === 'not_started' ? (
-              <TouchableOpacity onPress={startSessionTimer}>
-                <LinearGradient
-                  colors={theme.colors.gradientPrimary as any}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.startSessionButton}
-                >
-                  <Text style={styles.startSessionButtonText}>Inizia Sessione</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            ) : (
-              <>
-                <Text style={styles.sessionElapsedTime}>{formatTime(elapsedSeconds)}</Text>
-                <View style={styles.timerControls}>
-                  <TouchableOpacity
-                    style={styles.pauseResumeButton}
-                    onPress={sessionStatus === 'in_progress' ? pauseSessionTimer : resumeSessionTimer}
-                  >
-                    <Text style={styles.pauseResumeButtonText}>
-                      {sessionStatus === 'in_progress' ? 'Pausa' : 'Riprendi'}
-                    </Text>
-                  </TouchableOpacity>
-                  <Text style={styles.buttonDivider}>|</Text>
-                  <TouchableOpacity
-                    style={styles.cancelButton}
-                    onPress={cancelSessionTimer}
-                  >
-                    <Text style={styles.cancelButtonText}>Annulla</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-          </View>
-
-          {/* RIGHT SIDE: Complete Button */}
-          <TouchableOpacity onPress={handleCompleteWorkout} style={styles.completeWorkoutButton}>
-            <LinearGradient
-              colors={theme.colors.gradientPrimary as any}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.completeWorkoutGradient}
-            >
-              <Text style={styles.completeWorkoutButtonText}>
-                Completa{'\n'}Allenamento
-              </Text>
-            </LinearGradient>
+      {/* DOCK-STYLE FOOTER */}
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, theme.spacing.md) }]}>
+        {/* Session Timer / Start Button */}
+        {sessionStatus === 'not_started' ? (
+          <TouchableOpacity
+            onPress={startSessionTimer}
+            style={styles.footerStartButton}
+          >
+            <Text style={styles.footerStartIcon}>▶</Text>
+            <Text style={styles.footerStartText}>Inizia</Text>
           </TouchableOpacity>
-        </View>
+        ) : (
+          <View style={styles.footerTimerContainer}>
+            <Text style={styles.footerTimerTime}>{formatTime(elapsedSeconds)}</Text>
+            <View style={styles.footerTimerActions}>
+              <TouchableOpacity
+                onPress={sessionStatus === 'in_progress' ? pauseSessionTimer : resumeSessionTimer}
+                style={styles.footerSmallButton}
+              >
+                <Text style={styles.footerSmallButtonText}>
+                  {sessionStatus === 'in_progress' ? '⏸' : '▶'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={cancelSessionTimer}
+                style={styles.footerSmallButton}
+              >
+                <Text style={styles.footerSmallButtonText}>×</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* Complete Workout Button */}
+        <TouchableOpacity
+          onPress={handleCompleteWorkout}
+          style={styles.footerCompleteButton}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={[theme.colors.primary, theme.colors.primaryDark] as any}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.footerCompleteGradient}
+          >
+            <Text style={styles.footerCompleteIcon}>✓</Text>
+            <Text style={styles.footerCompleteText}>Completa</Text>
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
 
+      {/* VICTORY SCREEN MODAL */}
       <Modal
         visible={showCompletionModal}
-        transparent
         animationType="slide"
+        presentationStyle="pageSheet"
         onRequestClose={() => setShowCompletionModal(false)}
       >
-        <View style={styles.modalOverlay}>
+        <SafeAreaView style={styles.victoryContainer} edges={['top', 'bottom']}>
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.victoryKeyboardView}
           >
-            <View style={styles.completionModal}>
-              <ScrollView>
-                <Text style={styles.completionTitle}>SESSIONE COMPLETATA! 🎉</Text>
+            <ScrollView
+              ref={victoryScrollViewRef}
+              style={styles.victoryScrollView}
+              contentContainerStyle={styles.victoryScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Header Background */}
+              <LinearGradient
+                colors={[theme.colors.primary, theme.colors.primaryDarker] as any}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.victoryHeader}
+              >
+                <Text style={styles.victoryTitle}>SESSIONE{'\n'}COMPLETATA!</Text>
+                <Text style={styles.victorySubtitle}>
+                  {motivationalMessage}
+                </Text>
+              </LinearGradient>
 
-                <View style={styles.statsContainer}>
-                  <View style={styles.statRow}>
-                    <Text style={styles.statIcon}>⏱️</Text>
-                    <Text style={styles.statLabel}>Durata:</Text>
-                    <Text style={styles.statValue}>{Math.floor(elapsedSeconds / 60)} min</Text>
-                  </View>
-                  <View style={styles.statRow}>
-                    <Text style={styles.statIcon}>🔥</Text>
-                    <Text style={styles.statLabel}>Calorie bruciate:</Text>
-                    <Text style={styles.statValue}>{stats.caloriesBurned} kcal</Text>
-                  </View>
-                  <View style={styles.statRow}>
-                    <Text style={styles.statIcon}>💪</Text>
-                    <Text style={styles.statLabel}>Peso totale sollevato:</Text>
-                    <Text style={styles.statValue}>{stats.totalWeightLifted.toLocaleString()} kg</Text>
-                  </View>
+              {/* Hero Stat - Volume Totale */}
+              <View style={styles.heroStatContainer}>
+                <Text style={styles.heroStatValue}>{stats.totalWeightLifted.toLocaleString()}</Text>
+                <Text style={styles.heroStatUnit}>KG</Text>
+                <Text style={styles.heroStatLabel}>Volume Totale</Text>
+              </View>
+
+              {/* Secondary Stats Grid */}
+              <View style={styles.secondaryStatsGrid}>
+                <View style={styles.secondaryStatCard}>
+                  <Text style={styles.secondaryStatIcon}>⏱️</Text>
+                  <Text style={styles.secondaryStatValue}>{Math.floor(elapsedSeconds / 60)}</Text>
+                  <Text style={styles.secondaryStatLabel}>Minuti</Text>
                 </View>
+                <View style={styles.secondaryStatCard}>
+                  <Text style={styles.secondaryStatIcon}>🔥</Text>
+                  <Text style={styles.secondaryStatValue}>{stats.caloriesBurned}</Text>
+                  <Text style={styles.secondaryStatLabel}>Calorie</Text>
+                </View>
+                <View style={styles.secondaryStatCard}>
+                  <Text style={styles.secondaryStatIcon}>🏋️‍♂️</Text>
+                  <Text style={styles.secondaryStatValue}>{exercises.length}</Text>
+                  <Text style={styles.secondaryStatLabel}>Esercizi</Text>
+                </View>
+              </View>
 
-                <Text style={styles.ratingLabel}>⭐ Come è andata la sessione?</Text>
-                <View style={styles.starsContainer}>
+              {/* Rating Section */}
+              <View style={styles.victoryRatingSection}>
+                <Text style={styles.victoryRatingLabel}>Come è andata?</Text>
+                <View style={styles.victoryStarsContainer}>
                   {[1, 2, 3, 4, 5].map((star) => (
                     <TouchableOpacity
                       key={star}
                       onPress={() => {
                         setRating(star);
-                        if (Platform.OS === 'ios' || Platform.OS === 'android') {
-                          Vibration.vibrate(30);
-                        }
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                       }}
-                      style={styles.starButton}
+                      style={styles.victoryStarButton}
                     >
-                      <Text style={[styles.star, rating >= star && styles.starFilled]}>
+                      <Text style={[styles.victoryStar, rating >= star && styles.victoryStarFilled]}>
                         ★
                       </Text>
                     </TouchableOpacity>
                   ))}
                 </View>
+              </View>
 
-                <Text style={styles.notesLabel}>💬 Note sessione (opzionale)</Text>
+              {/* Notes Section */}
+              <View style={styles.victoryNotesSection}>
+                <Text style={styles.victoryNotesLabel}>Note sessione (opzionale)</Text>
                 <TextInput
-                  style={styles.completionNotesInput}
+                  ref={notesInputRef}
+                  style={styles.victoryNotesInput}
                   placeholder="Bella giornata, molta energia..."
                   placeholderTextColor={theme.colors.textLight}
                   multiline
@@ -1009,30 +1067,33 @@ const SessionScreen: React.FC<SessionScreenProps> = ({ navigation, route }) => {
                   value={completionNotes}
                   onChangeText={setCompletionNotes}
                 />
+              </View>
+            </ScrollView>
 
-                <TouchableOpacity
-                  style={styles.saveButton}
-                  onPress={saveAndFinish}
-                  disabled={isCompletingSession}
+            {/* Action Buttons Footer */}
+            <View style={styles.victoryFooter}>
+              <TouchableOpacity
+                style={styles.victorySaveButton}
+                onPress={saveAndFinish}
+                disabled={isCompletingSession}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={[theme.colors.primary, theme.colors.primaryDarker] as any}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.victorySaveGradient}
                 >
                   {isCompletingSession ? (
                     <ActivityIndicator color={theme.colors.white} />
                   ) : (
-                    <Text style={styles.saveButtonText}>Salva e Chiudi</Text>
+                    <Text style={styles.victorySaveButtonText}>Salva Allenamento</Text>
                   )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.modalCancelButton}
-                  onPress={() => setShowCompletionModal(false)}
-                  disabled={isCompletingSession}
-                >
-                  <Text style={styles.modalCancelButtonText}>Annulla</Text>
-                </TouchableOpacity>
-              </ScrollView>
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
           </KeyboardAvoidingView>
-        </View>
+        </SafeAreaView>
       </Modal>
 
       {/* INFO EXERCISE MODAL */}
@@ -1046,11 +1107,36 @@ const SessionScreen: React.FC<SessionScreenProps> = ({ navigation, route }) => {
           <View style={styles.infoModal}>
             <Text style={styles.infoModalTitle}>{selectedExerciseInfo?.name || 'Esercizio'}</Text>
             <ScrollView style={styles.infoModalContent}>
-              <Text style={styles.infoModalText}>
-                {selectedExerciseInfo
-                  ? `Questo esercizio prevede ${selectedExerciseInfo.sets.length} set da ${selectedExerciseInfo.sets[0]?.targetReps} ripetizioni con ${selectedExerciseInfo.sets[0]?.targetWeight}kg di carico.\n\nRiposo tra i set: ${selectedExerciseInfo.restSeconds} secondi.`
-                  : 'Nessuna informazione disponibile per questo esercizio.'}
-              </Text>
+              <View style={styles.infoModalContentContainer}>
+                {selectedExerciseInfo?.technicalInstructions ? (
+                  <>
+                    <View style={styles.infoSection}>
+                      <Text style={styles.infoSectionTitle}>🛠️ Tecnica</Text>
+                      <Text style={styles.infoModalText}>{selectedExerciseInfo.technicalInstructions}</Text>
+                    </View>
+
+                    {selectedExerciseInfo.progressiveOverloadTips && (
+                      <View style={styles.infoSection}>
+                        <Text style={styles.infoSectionTitle}>📈 Sovraccarico Progressivo</Text>
+                        <Text style={styles.infoModalText}>{selectedExerciseInfo.progressiveOverloadTips}</Text>
+                      </View>
+                    )}
+
+                    {selectedExerciseInfo.physicalCautions && (
+                      <View style={styles.infoSection}>
+                        <Text style={styles.infoSectionTitle}>⚠️ Attenzione</Text>
+                        <Text style={styles.infoModalText}>{selectedExerciseInfo.physicalCautions}</Text>
+                      </View>
+                    )}
+                  </>
+                ) : (
+                  <Text style={styles.infoModalText}>
+                    {selectedExerciseInfo
+                      ? `Questo esercizio prevede ${selectedExerciseInfo.sets.length} set da ${selectedExerciseInfo.sets[0]?.targetReps} ripetizioni con ${selectedExerciseInfo.sets[0]?.targetWeight}kg di carico.\n\nRiposo tra i set: ${selectedExerciseInfo.restSeconds} secondi.`
+                      : 'Nessuna informazione disponibile per questo esercizio.'}
+                  </Text>
+                )}
+              </View>
             </ScrollView>
             <TouchableOpacity
               style={styles.infoModalButton}
@@ -1117,7 +1203,7 @@ const SessionScreen: React.FC<SessionScreenProps> = ({ navigation, route }) => {
                     value={exercise.name}
                     onChangeText={(text) => updateExerciseName(exerciseIndex, text)}
                     placeholder="Nome esercizio"
-                    placeholderTextColor="#999"
+                    placeholderTextColor={theme.colors.textLight}
                   />
                 </View>
 
@@ -1189,7 +1275,7 @@ const SessionScreen: React.FC<SessionScreenProps> = ({ navigation, route }) => {
                     value={exercise.notes}
                     onChangeText={(text) => updateExerciseNotes(exerciseIndex, text)}
                     placeholder="Aggiungi note..."
-                    placeholderTextColor="#999"
+                    placeholderTextColor={theme.colors.textLight}
                     multiline
                     numberOfLines={3}
                   />
@@ -1212,7 +1298,7 @@ const SessionScreen: React.FC<SessionScreenProps> = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.backgroundSecondary,
@@ -1223,6 +1309,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: theme.colors.backgroundSecondary,
   },
+
+  // NAVIGATION HEADER STYLES
+  headerTitleContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTimerText: {
+    fontSize: theme.fontSize.xxl,
+    fontWeight: theme.fontWeight.bold,
+    color: theme.colors.primary,
+  },
+  headerSkipButtonNav: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    backgroundColor: theme.colors.error,
+    borderRadius: theme.borderRadius.md,
+    marginRight: theme.spacing.sm,
+  },
+  headerSkipText: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.semibold,
+    color: theme.colors.background,
+  },
+
   keyboardView: {
     flex: 1,
   },
@@ -1258,7 +1368,7 @@ const styles = StyleSheet.create({
   },
   // EXERCISE CARD - ATHLETIC/BOXY STYLE
   exerciseCard: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderRadius: 8,
     borderWidth: 2,
     borderColor: theme.colors.border,
@@ -1357,7 +1467,7 @@ const styles = StyleSheet.create({
   subHeaderText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#999',
+    color: theme.colors.textLight,
     textTransform: 'uppercase',
     width: 40,
     textAlign: 'center',
@@ -1418,7 +1528,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: theme.fontWeight.bold,
     textAlign: 'center',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     color: theme.colors.text,
   },
   setInputCompleted: {
@@ -1433,7 +1543,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
   },
   setCheckboxCompleted: {
     backgroundColor: theme.colors.success,
@@ -1445,7 +1555,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeight.bold,
   },
   checkmarkUncompleted: {
-    color: '#D0D0D0',
+    color: theme.colors.borderLight,
   },
   notesToggle: {
     flexDirection: 'row',
@@ -1455,7 +1565,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: theme.colors.borderLight,
   },
   notesToggleText: {
     fontSize: 13,
@@ -1488,95 +1598,97 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeight.semibold,
     color: theme.colors.primary,
   },
-  // BOTTOM CONTROLS
-  bottomControls: {
+
+  // DOCK-STYLE FOOTER
+  footer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     paddingHorizontal: theme.spacing.md,
     paddingTop: theme.spacing.md,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.borderLight,
+    borderTopColor: theme.colors.border,
     shadowColor: theme.colors.black,
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
-  },
-  bottomButtonsContainer: {
-    flexDirection: 'row',
-    gap: 1,
-    height: 80,
-  },
-  leftBottomButton: {
-    flex: 1,
-    backgroundColor: theme.colors.cardBackground,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRightWidth: 1,
-    borderRightColor: theme.colors.borderLight,
-    paddingVertical: theme.spacing.sm,
-  },
-  startSessionButton: {
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  startSessionButtonText: {
-    fontSize: 16,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.white,
-  },
-  sessionElapsedTime: {
-    fontSize: 24,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
-  },
-  timerControls: {
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 10,
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.sm,
   },
-  pauseResumeButton: {
-    paddingVertical: 6,
-    paddingHorizontal: theme.spacing.md,
-  },
-  pauseResumeButtonText: {
-    fontSize: 14,
-    fontWeight: theme.fontWeight.semibold,
-    color: theme.colors.primary,
-  },
-  buttonDivider: {
-    fontSize: 14,
-    color: theme.colors.borderDark,
-  },
-  cancelButton: {
-    paddingVertical: 6,
-    paddingHorizontal: theme.spacing.md,
-  },
-  cancelButtonText: {
-    fontSize: 14,
-    fontWeight: theme.fontWeight.semibold,
-    color: theme.colors.error,
-  },
-  completeWorkoutButton: {
+  footerStartButton: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.sm,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.borderRadius.lg,
+    minHeight: 54,
+    minWidth: 120,
   },
-  completeWorkoutGradient: {
+  footerStartIcon: {
+    fontSize: theme.fontSize.xl,
+    color: theme.colors.background,
+  },
+  footerStartText: {
+    fontSize: theme.fontSize.lg,
+    fontWeight: theme.fontWeight.bold,
+    color: theme.colors.background,
+  },
+  footerTimerContainer: {
     flex: 1,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  footerTimerTime: {
+    fontSize: theme.fontSize.xxl,
+    fontWeight: theme.fontWeight.bold,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+  },
+  footerTimerActions: {
+    flexDirection: 'row',
+    gap: theme.spacing.xs,
+  },
+  footerSmallButton: {
+    width: 32,
+    height: 32,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  completeWorkoutButtonText: {
-    fontSize: 16,
+  footerSmallButtonText: {
+    fontSize: theme.fontSize.md,
+    color: theme.colors.text,
+  },
+  footerCompleteButton: {
+    flex: 1.5,
+  },
+  footerCompleteGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.xs,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.borderRadius.lg,
+    minHeight: 54,
+  },
+  footerCompleteIcon: {
+    fontSize: theme.fontSize.xl,
+    color: theme.colors.background,
+  },
+  footerCompleteText: {
+    fontSize: theme.fontSize.lg,
     fontWeight: theme.fontWeight.bold,
-    color: theme.colors.white,
-    textAlign: 'center',
+    color: theme.colors.background,
   },
   modalOverlay: {
     flex: 1,
@@ -1584,20 +1696,216 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  completionModal: {
-    backgroundColor: theme.colors.white,
-    borderRadius: 20,
-    padding: theme.spacing.lg,
-    width: '90%',
-    maxHeight: '80%',
+
+  // VICTORY SCREEN STYLES
+  victoryContainer: {
+    flex: 1,
+    backgroundColor: theme.colors.backgroundSecondary,
   },
-  completionTitle: {
-    fontSize: 24,
+  victoryKeyboardView: {
+    flex: 1,
+  },
+  victoryScrollView: {
+    flex: 1,
+  },
+  victoryScrollContent: {
+    flexGrow: 1,
+    paddingBottom: theme.spacing.xxl,
+  },
+  victoryHeader: {
+    paddingTop: theme.spacing.xxl,
+    paddingBottom: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  victoryTitle: {
+    fontSize: 48,
+    fontWeight: theme.fontWeight.bold,
+    color: theme.colors.white,
+    textAlign: 'center',
+    lineHeight: 56,
+    letterSpacing: 1,
+  },
+  victorySubtitle: {
+    fontSize: theme.fontSize.xl,
+    fontWeight: theme.fontWeight.semibold,
+    color: theme.colors.white,
+    textAlign: 'center',
+    marginTop: theme.spacing.md,
+    opacity: 0.95,
+  },
+  heroStatContainer: {
+    backgroundColor: theme.colors.cardBackground,
+    marginHorizontal: theme.spacing.lg,
+    marginTop: -theme.spacing.xl,
+    borderRadius: theme.borderRadius.xl,
+    paddingVertical: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.lg,
+    alignItems: 'center',
+    shadowColor: theme.colors.black,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  heroStatValue: {
+    fontSize: 72,
+    fontWeight: theme.fontWeight.bold,
+    color: theme.colors.primary,
+    lineHeight: 80,
+  },
+  heroStatUnit: {
+    fontSize: theme.fontSize.xxl,
+    fontWeight: theme.fontWeight.bold,
+    color: theme.colors.textSecondary,
+    marginTop: -theme.spacing.sm,
+  },
+  heroStatLabel: {
+    fontSize: theme.fontSize.lg,
+    fontWeight: theme.fontWeight.semibold,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  secondaryStatsGrid: {
+    flexDirection: 'row',
+    marginHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.lg,
+    gap: theme.spacing.sm,
+  },
+  secondaryStatCard: {
+    flex: 1,
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: theme.borderRadius.lg,
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.md,
+    alignItems: 'center',
+    shadowColor: theme.colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  secondaryStatIcon: {
+    fontSize: 32,
+    marginBottom: theme.spacing.xs,
+  },
+  secondaryStatValue: {
+    fontSize: theme.fontSize.xxl,
     fontWeight: theme.fontWeight.bold,
     color: theme.colors.text,
-    textAlign: 'center',
-    marginBottom: theme.spacing.lg,
   },
+  secondaryStatLabel: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.xs,
+    textAlign: 'center',
+  },
+  victoryRatingSection: {
+    marginHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.xl,
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: theme.borderRadius.xl,
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.lg,
+    shadowColor: theme.colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  victoryRatingLabel: {
+    fontSize: theme.fontSize.lg,
+    fontWeight: theme.fontWeight.semibold,
+    color: theme.colors.text,
+    textAlign: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  victoryStarsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: theme.spacing.xs,
+  },
+  victoryStarButton: {
+    padding: theme.spacing.sm,
+  },
+  victoryStar: {
+    fontSize: 52,
+    color: theme.colors.borderLight,
+  },
+  victoryStarFilled: {
+    color: theme.colors.gold,
+  },
+  victoryNotesSection: {
+    marginHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.lg,
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: theme.borderRadius.xl,
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.lg,
+    shadowColor: theme.colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  victoryNotesLabel: {
+    fontSize: theme.fontSize.md,
+    fontWeight: theme.fontWeight.semibold,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.sm,
+  },
+  victoryNotesInput: {
+    backgroundColor: theme.colors.backgroundSecondary,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    fontSize: theme.fontSize.md,
+    color: theme.colors.text,
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  victoryFooter: {
+    backgroundColor: theme.colors.cardBackground,
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.borderLight,
+    shadowColor: theme.colors.black,
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  victorySaveButton: {
+    borderRadius: 30,
+    overflow: 'hidden',
+  },
+  victorySaveGradient: {
+    paddingVertical: theme.spacing.md + 2,
+    paddingHorizontal: theme.spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  victorySaveButtonText: {
+    fontSize: theme.fontSize.lg,
+    fontWeight: theme.fontWeight.bold,
+    color: theme.colors.white,
+    letterSpacing: 0.5,
+  },
+  victoryCancelButton: {
+    paddingVertical: theme.spacing.sm,
+    alignItems: 'center',
+  },
+  victoryCancelButtonText: {
+    fontSize: theme.fontSize.md,
+    color: theme.colors.textSecondary,
+    fontWeight: theme.fontWeight.medium,
+  },
+
+  // Legacy modal styles (kept for info modal)
   statsContainer: {
     marginBottom: theme.spacing.lg,
   },
@@ -1622,68 +1930,15 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeight.bold,
     color: theme.colors.text,
   },
-  ratingLabel: {
-    fontSize: 16,
-    fontWeight: theme.fontWeight.semibold,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.sm,
-    textAlign: 'center',
-  },
   starsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     marginBottom: theme.spacing.lg,
   },
-  starButton: {
-    padding: theme.spacing.xs,
-  },
-  star: {
-    fontSize: 40,
-    color: theme.colors.border,
-  },
-  starFilled: {
-    color: theme.colors.gold,
-  },
-  notesLabel: {
-    fontSize: 16,
-    fontWeight: theme.fontWeight.semibold,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.sm,
-  },
-  completionNotesInput: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 8,
-    padding: theme.spacing.sm,
-    fontSize: 14,
-    minHeight: 80,
-    textAlignVertical: 'top',
-    marginBottom: theme.spacing.lg,
-  },
-  saveButton: {
-    backgroundColor: theme.colors.success,
-    paddingVertical: theme.spacing.md,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: theme.spacing.sm,
-  },
-  saveButtonText: {
-    fontSize: 18,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.white,
-  },
-  modalCancelButton: {
-    paddingVertical: theme.spacing.sm,
-    alignItems: 'center',
-  },
-  modalCancelButtonText: {
-    fontSize: 16,
-    color: theme.colors.textSecondary,
-  },
 
   // Info Modal
   infoModal: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderRadius: 20,
     padding: theme.spacing.lg,
     width: '85%',
@@ -1723,7 +1978,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.backgroundSecondary,
   },
   editModalHeader: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.md,
     flexDirection: 'row',
@@ -1746,7 +2001,7 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
   },
   editExerciseCard: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderRadius: 12,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.md,
@@ -1803,7 +2058,7 @@ const styles = StyleSheet.create({
     marginVertical: 2,
   },
   editModalFooter: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.md,
     borderTopWidth: 1,
@@ -1828,7 +2083,7 @@ const styles = StyleSheet.create({
   },
   editModalCancelText: {
     fontSize: 16,
-    color: '#007AFF',
+    color: theme.colors.primary,
     fontWeight: theme.fontWeight.semibold,
   },
   editModalSaveHeaderButton: {
@@ -1837,7 +2092,7 @@ const styles = StyleSheet.create({
   },
   editModalSaveHeaderText: {
     fontSize: 16,
-    color: '#007AFF',
+    color: theme.colors.primary,
     fontWeight: theme.fontWeight.bold,
   },
   dragHandle: {
@@ -1849,7 +2104,7 @@ const styles = StyleSheet.create({
   },
   dragHandleText: {
     fontSize: 20,
-    color: '#999',
+    color: theme.colors.textLight,
   },
   reorderButtons: {
     flexDirection: 'column',
@@ -1873,7 +2128,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     fontSize: 16,
     color: theme.colors.text,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
   },
   editSetsSection: {
     marginTop: 12,
@@ -1888,12 +2143,12 @@ const styles = StyleSheet.create({
   editSetRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9F9F9',
+    backgroundColor: theme.colors.backgroundSecondary,
     borderRadius: 8,
     padding: 10,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: theme.colors.borderLight,
   },
   editSetNumber: {
     fontSize: 16,
@@ -1922,7 +2177,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     fontSize: 15,
     textAlign: 'center',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
   },
   removeSetButton: {
     marginLeft: 8,
@@ -1930,11 +2185,11 @@ const styles = StyleSheet.create({
   },
   removeSetButtonText: {
     fontSize: 20,
-    color: '#FF3B30',
+    color: theme.colors.error,
     fontWeight: theme.fontWeight.bold,
   },
   addSetButtonEdit: {
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.primary,
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 8,
@@ -1954,9 +2209,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     fontSize: 15,
     color: theme.colors.text,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     minHeight: 80,
     textAlignVertical: 'top',
+  },
+  infoModalContentContainer: {
+    paddingBottom: 20,
+  },
+  infoSection: {
+    marginBottom: 20,
+  },
+  infoSectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: theme.colors.primary,
+    marginBottom: 8,
   },
 });
 

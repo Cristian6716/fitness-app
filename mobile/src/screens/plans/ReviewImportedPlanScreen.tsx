@@ -16,7 +16,8 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import apiService from '../../services/api.service';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 
 // Components
 import PlanPreviewCard from '../../components/plans/PlanPreviewCard';
@@ -51,6 +52,8 @@ interface PlanData {
 type ViewMode = 'preview' | 'edit-session' | 'edit-plan-info';
 
 const ReviewImportedPlanScreen: React.FC<Props> = ({ navigation, route }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const { parsedData, warnings } = route.params;
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -473,11 +476,11 @@ const ReviewImportedPlanScreen: React.FC<Props> = ({ navigation, route }) => {
     if (mode === 'edit-session') {
       title = 'Modifica Sessione';
       rightButtonText = '';
-      rightButtonAction = () => {};
+      rightButtonAction = () => { };
     } else if (mode === 'edit-plan-info') {
       title = 'Modifica Info Piano';
       rightButtonText = '';
-      rightButtonAction = () => {};
+      rightButtonAction = () => { };
     }
 
     return (
@@ -551,7 +554,7 @@ const ReviewImportedPlanScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.backgroundSecondary,
@@ -562,7 +565,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.borderLight,
   },
@@ -621,7 +624,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.spacing.sm,
     padding: theme.spacing.md,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderTopWidth: 1,
     borderTopColor: theme.colors.borderLight,
   },

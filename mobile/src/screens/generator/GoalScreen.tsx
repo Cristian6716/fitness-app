@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 
 type GoalScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'GoalSelection'>;
@@ -20,6 +21,8 @@ const goals = [
 ];
 
 const GoalScreen: React.FC<GoalScreenProps> = ({ navigation, route }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const { personalInfo } = route.params;
   const [selectedGoal, setSelectedGoal] = useState<string | null>(null);
   const [goalDetails, setGoalDetails] = useState('');
@@ -48,60 +51,60 @@ const GoalScreen: React.FC<GoalScreenProps> = ({ navigation, route }) => {
         >
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View>
-            <Text style={styles.title}>Qual è il tuo obiettivo principale?</Text>
-            <Text style={styles.subtitle}>Seleziona quello che meglio si adatta al tuo obiettivo</Text>
+              <Text style={styles.title}>Qual è il tuo obiettivo principale?</Text>
+              <Text style={styles.subtitle}>Seleziona quello che meglio si adatta al tuo obiettivo</Text>
 
-            <View style={styles.optionsContainer}>
-              {goals.map((goal) => (
-                <TouchableOpacity
-                  key={goal.id}
-                  style={[styles.optionCard, selectedGoal === goal.id && styles.optionCardActive]}
-                  onPress={() => setSelectedGoal(goal.id)}
-                >
-                  <Text
-                    style={[styles.optionLabel, selectedGoal === goal.id && styles.optionLabelActive]}
+              <View style={styles.optionsContainer}>
+                {goals.map((goal) => (
+                  <TouchableOpacity
+                    key={goal.id}
+                    style={[styles.optionCard, selectedGoal === goal.id && styles.optionCardActive]}
+                    onPress={() => setSelectedGoal(goal.id)}
                   >
-                    {goal.label}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.optionDescription,
-                      selectedGoal === goal.id && styles.optionDescriptionActive,
-                    ]}
-                  >
-                    {goal.description}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <Text
+                      style={[styles.optionLabel, selectedGoal === goal.id && styles.optionLabelActive]}
+                    >
+                      {goal.label}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.optionDescription,
+                        selectedGoal === goal.id && styles.optionDescriptionActive,
+                      ]}
+                    >
+                      {goal.description}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.sectionLabel}>Aggiungi dettagli (opzionale)</Text>
+              <TextInput
+                style={styles.textArea}
+                placeholder="Es: voglio migliorare la panca di 20kg"
+                value={goalDetails}
+                onChangeText={setGoalDetails}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+
+              <TouchableOpacity
+                style={[styles.button, !selectedGoal && styles.buttonDisabled]}
+                onPress={handleNext}
+                disabled={!selectedGoal}
+              >
+                <Text style={styles.buttonText}>Continua</Text>
+              </TouchableOpacity>
             </View>
-
-            <Text style={styles.sectionLabel}>Aggiungi dettagli (opzionale)</Text>
-            <TextInput
-              style={styles.textArea}
-              placeholder="Es: voglio migliorare la panca di 20kg"
-              value={goalDetails}
-              onChangeText={setGoalDetails}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-            />
-
-            <TouchableOpacity
-              style={[styles.button, !selectedGoal && styles.buttonDisabled]}
-              onPress={handleNext}
-              disabled={!selectedGoal}
-            >
-              <Text style={styles.buttonText}>Continua</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableWithoutFeedback>
-      </ScrollView>
+          </TouchableWithoutFeedback>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -142,6 +145,7 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.md,
     minHeight: 80,
     marginBottom: theme.spacing.lg,
+    color: theme.colors.text,
   },
   optionCard: {
     padding: 20,

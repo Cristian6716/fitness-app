@@ -13,12 +13,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 import { CustomHeader } from '../../components/CustomHeader';
 import apiService from '../../services/api.service';
 import { NewsArticle } from '../../types/api.types';
 
 export const NewsScreen = () => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -158,7 +161,7 @@ export const NewsScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <View style={styles.container}>
       <CustomHeader title="News" />
 
       {loading && articles.length === 0 ? (
@@ -185,11 +188,11 @@ export const NewsScreen = () => {
           onEndReachedThreshold={0.5}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -203,11 +206,11 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
   },
   card: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderRadius: 12,
     marginBottom: theme.spacing.md,
     overflow: 'hidden',
-    shadowColor: '#000',
+    shadowColor: theme.colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,

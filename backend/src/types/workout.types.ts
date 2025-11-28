@@ -40,6 +40,9 @@ export interface ExerciseData {
   targetWeight?: number;
   restSeconds: number;
   notes?: string;
+  technicalInstructions?: string;
+  progressiveOverloadTips?: string;
+  physicalCautions?: string;
   order: number;
 }
 

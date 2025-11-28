@@ -9,7 +9,8 @@ import {
   PanResponder,
   Vibration,
 } from 'react-native';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 
 interface SetData {
   setNumber: number;
@@ -46,6 +47,8 @@ const SwipeableSetRow: React.FC<SwipeableSetRowProps> = ({
   onDuplicateSet,
   previousData,
 }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const translateX = useRef(new Animated.Value(0)).current;
   const lastSwipeDirection = useRef<'left' | 'right' | null>(null);
 
@@ -188,7 +191,7 @@ const SwipeableSetRow: React.FC<SwipeableSetRowProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     position: 'relative',
     marginBottom: 1,
@@ -225,12 +228,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: theme.spacing.sm,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.borderLight,
   },
   activeSetRow: {
-    backgroundColor: '#E8F5E9',
+    backgroundColor: theme.colors.primaryLight,
   },
   completedSetRow: {
     opacity: 0.6,

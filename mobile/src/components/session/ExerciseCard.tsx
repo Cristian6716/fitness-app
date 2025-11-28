@@ -11,7 +11,8 @@ import {
   UIManager,
   Vibration,
 } from 'react-native';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 import SwipeableSetRow from './SwipeableSetRow';
 
 // Enable LayoutAnimation on Android
@@ -67,6 +68,8 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({
   onShowInfo,
   previousWorkoutData = [],
 }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const completedSets = sets.filter((s) => s.completed).length;
   const totalSets = sets.length;
   const activeSetIndex = sets.findIndex((s) => !s.completed);
@@ -185,9 +188,9 @@ const ExerciseCard: React.FC<ExerciseCardProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   card: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderRadius: theme.borderRadius.lg,
     marginHorizontal: theme.spacing.md,
     marginVertical: theme.spacing.sm,
@@ -289,7 +292,7 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.borderLight,
   },
   activeSetRow: {
-    backgroundColor: '#E8F5E9',
+    backgroundColor: theme.colors.primaryLight,
     marginHorizontal: -theme.spacing.md,
     paddingHorizontal: theme.spacing.md,
   },

@@ -5,7 +5,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../navigation/AppNavigator';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 import apiService from '../../services/api.service';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -16,6 +17,8 @@ type FileUploadScreenProps = {
 };
 
 const FileUploadScreen: React.FC<FileUploadScreenProps> = ({ navigation }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
   const { completeOnboarding } = useAuth();
@@ -65,7 +68,7 @@ const FileUploadScreen: React.FC<FileUploadScreenProps> = ({ navigation }) => {
           setIsUploading(false);
           setUploadProgress('');
 
-          if (!uploadedPlan || !uploadedPlan.id) {
+          if (!uploadedPlan || !uploadedPlan.parsedData || !uploadedPlan.parsedData.id) {
             Alert.alert(
               'Errore',
               'Il piano è stato caricato ma non è possibile aprirlo. Vai su "Plans" per visualizzarlo.',
@@ -84,7 +87,7 @@ const FileUploadScreen: React.FC<FileUploadScreenProps> = ({ navigation }) => {
               {
                 text: 'Visualizza Piano',
                 onPress: () => {
-                  navigation.navigate('PlanDetails', { planId: uploadedPlan.id });
+                  navigation.navigate('PlanDetails', { planId: uploadedPlan.parsedData.id });
                 },
               },
             ]
@@ -170,7 +173,7 @@ const FileUploadScreen: React.FC<FileUploadScreenProps> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,

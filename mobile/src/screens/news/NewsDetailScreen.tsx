@@ -14,7 +14,8 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 import apiService from '../../services/api.service';
 import { NewsArticle } from '../../types/api.types';
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -23,6 +24,8 @@ type NewsDetailRouteProp = RouteProp<RootStackParamList, 'NewsDetail'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'NewsDetail'>;
 
 export const NewsDetailScreen = () => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<NewsDetailRouteProp>();
   const { articleId } = route.params;
@@ -163,7 +166,7 @@ export const NewsDetailScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -184,10 +187,10 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -259,7 +262,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
     borderRadius: 8,

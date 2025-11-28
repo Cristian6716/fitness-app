@@ -8,7 +8,8 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 
 interface PlanInfoEditViewProps {
   name: string;
@@ -35,6 +36,8 @@ const PlanInfoEditView: React.FC<PlanInfoEditViewProps> = ({
   onFinish,
   onCancel,
 }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const handleCancel = () => {
     if (hasUnsavedChanges) {
       Alert.alert(
@@ -131,7 +134,7 @@ const PlanInfoEditView: React.FC<PlanInfoEditViewProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.backgroundSecondary,
@@ -141,7 +144,7 @@ const styles = StyleSheet.create({
     paddingBottom: 80, // Extra space for Android nav bar
   },
   card: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.lg,
     shadowColor: theme.colors.black,
@@ -166,7 +169,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   input: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderWidth: 1,
     borderColor: theme.colors.primary,
     borderRadius: theme.borderRadius.md,

@@ -3,7 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 
 type DaysPerWeekScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'DaysPerWeek'>;
@@ -11,12 +12,19 @@ type DaysPerWeekScreenProps = {
 };
 
 const DaysPerWeekScreen: React.FC<DaysPerWeekScreenProps> = ({ navigation, route }) => {
-  const { goal } = route.params;
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
+  const { goal, personalInfo, goalDetails } = route.params;
   const [selectedDays, setSelectedDays] = useState<number | null>(null);
 
   const handleNext = () => {
     if (selectedDays) {
-      navigation.navigate('Equipment', { goal, daysPerWeek: selectedDays });
+      navigation.navigate('Equipment', {
+        personalInfo,
+        goal,
+        goalDetails,
+        daysPerWeek: selectedDays,
+      });
     }
   };
 
@@ -52,7 +60,7 @@ const DaysPerWeekScreen: React.FC<DaysPerWeekScreenProps> = ({ navigation, route
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,

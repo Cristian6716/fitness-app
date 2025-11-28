@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 
 interface PlanPreviewCardProps {
   name: string;
@@ -17,6 +18,8 @@ const PlanPreviewCard: React.FC<PlanPreviewCardProps> = ({
   isAiGenerated,
   isEditMode,
 }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   return (
     <View style={styles.container}>
       <Text style={styles.planName}>{name}</Text>
@@ -38,9 +41,9 @@ const PlanPreviewCard: React.FC<PlanPreviewCardProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     padding: theme.spacing.lg,
     borderRadius: theme.borderRadius.lg,
     marginHorizontal: theme.spacing.md,

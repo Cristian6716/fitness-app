@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 
 type FrequencyScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Frequency'>;
@@ -19,6 +20,8 @@ const sessionDurations = [
 ];
 
 const FrequencyScreen: React.FC<FrequencyScreenProps> = ({ navigation, route }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const { personalInfo, goal, goalDetails } = route.params;
   const [selectedDays, setSelectedDays] = useState<number | null>(null);
   const [selectedDuration, setSelectedDuration] = useState<number | null>(null);
@@ -51,83 +54,83 @@ const FrequencyScreen: React.FC<FrequencyScreenProps> = ({ navigation, route }) 
         >
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View>
-      <Text style={styles.title}>Frequenza e Durata</Text>
-      <Text style={styles.subtitle}>Configuriamo il tuo piano settimanale</Text>
+              <Text style={styles.title}>Frequenza e Durata</Text>
+              <Text style={styles.subtitle}>Configuriamo il tuo piano settimanale</Text>
 
-      <Text style={styles.sectionTitle}>Quanti giorni a settimana puoi allenarti? *</Text>
-      <View style={styles.daysContainer}>
-        {[2, 3, 4, 5, 6].map((days) => (
-          <TouchableOpacity
-            key={days}
-            style={[styles.dayButton, selectedDays === days && styles.dayButtonActive]}
-            onPress={() => setSelectedDays(days)}
-          >
-            <Text style={[styles.dayText, selectedDays === days && styles.dayTextActive]}>
-              {days}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+              <Text style={styles.sectionTitle}>Quanti giorni a settimana puoi allenarti? *</Text>
+              <View style={styles.daysContainer}>
+                {[2, 3, 4, 5, 6].map((days) => (
+                  <TouchableOpacity
+                    key={days}
+                    style={[styles.dayButton, selectedDays === days && styles.dayButtonActive]}
+                    onPress={() => setSelectedDays(days)}
+                  >
+                    <Text style={[styles.dayText, selectedDays === days && styles.dayTextActive]}>
+                      {days}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-      <Text style={styles.sectionTitle}>Quanto tempo hai per sessione? (opzionale)</Text>
-      <Text style={styles.helper}>Se non selezioni nulla, assumeremo 60 minuti</Text>
-      <View style={styles.durationsContainer}>
-        {sessionDurations.map((duration) => (
-          <TouchableOpacity
-            key={duration.value}
-            style={[
-              styles.durationCard,
-              selectedDuration === duration.value && styles.durationCardActive,
-            ]}
-            onPress={() => setSelectedDuration(duration.value)}
-          >
-            <Text
-              style={[
-                styles.durationText,
-                selectedDuration === duration.value && styles.durationTextActive,
-              ]}
-            >
-              {duration.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+              <Text style={styles.sectionTitle}>Quanto tempo hai per sessione? (opzionale)</Text>
+              <Text style={styles.helper}>Se non selezioni nulla, assumeremo 60 minuti</Text>
+              <View style={styles.durationsContainer}>
+                {sessionDurations.map((duration) => (
+                  <TouchableOpacity
+                    key={duration.value}
+                    style={[
+                      styles.durationCard,
+                      selectedDuration === duration.value && styles.durationCardActive,
+                    ]}
+                    onPress={() => setSelectedDuration(duration.value)}
+                  >
+                    <Text
+                      style={[
+                        styles.durationText,
+                        selectedDuration === duration.value && styles.durationTextActive,
+                      ]}
+                    >
+                      {duration.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-      <Text style={styles.sectionTitle}>Note orari (opzionale)</Text>
-      <TextInput
-        style={styles.textArea}
-        placeholder="Es: solo mattina presto, no weekend"
-        value={scheduleNotes}
-        onChangeText={setScheduleNotes}
-        multiline
-        numberOfLines={2}
-        textAlignVertical="top"
-      />
+              <Text style={styles.sectionTitle}>Note orari (opzionale)</Text>
+              <TextInput
+                style={styles.textArea}
+                placeholder="Es: solo mattina presto, no weekend"
+                value={scheduleNotes}
+                onChangeText={setScheduleNotes}
+                multiline
+                numberOfLines={2}
+                textAlignVertical="top"
+              />
 
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>Indietro</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, !selectedDays && styles.buttonDisabled]}
-          onPress={handleNext}
-          disabled={!selectedDays}
-        >
-          <Text style={styles.buttonText}>Continua</Text>
-        </TouchableOpacity>
-      </View>
-          </View>
-        </TouchableWithoutFeedback>
-      </ScrollView>
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                  style={styles.backButton}
+                  onPress={() => navigation.goBack()}
+                >
+                  <Text style={styles.backButtonText}>Indietro</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.button, !selectedDays && styles.buttonDisabled]}
+                  onPress={handleNext}
+                  disabled={!selectedDays}
+                >
+                  <Text style={styles.buttonText}>Continua</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -226,6 +229,7 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.md,
     minHeight: 60,
     marginBottom: theme.spacing.lg,
+    color: theme.colors.text,
   },
   buttonContainer: {
     flexDirection: 'row',

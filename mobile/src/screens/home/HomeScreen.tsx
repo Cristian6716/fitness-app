@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,8 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { MainTabParamList, RootStackParamList } from '../../navigation/AppNavigator';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 import apiService from '../../services/api.service';
 import { WorkoutPlan } from '../../types/api.types';
 import { CustomHeader } from '../../components/CustomHeader';
@@ -39,6 +40,9 @@ interface WeeklyStats {
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
+  const { theme } = useTheme();
+  const styles = useMemo(() => getStyles(theme), [theme]);
+
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activePlan, setActivePlan] = useState<WorkoutPlan | null>(null);
@@ -182,12 +186,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <View style={styles.container}>
       <CustomHeader title="Home" />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.colors.primary}
+            colors={[theme.colors.primary]}
+          />
         }
       >
         {/* Header */}
@@ -350,13 +359,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           <View style={styles.actionRow}>
             <TouchableOpacity
               style={[styles.actionCard, styles.actionCardDisabled]}
-              disabled
+              onPress={() => navigation.navigate('Statistics')}
             >
               <Ionicons name="bar-chart" size={32} color={theme.colors.textLight} />
               <Text style={[styles.actionText, styles.actionTextDisabled]}>
                 Statistiche
               </Text>
-              <Text style={styles.comingSoon}>Presto</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -380,11 +388,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -412,7 +420,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
   },
   heroCard: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderRadius: theme.borderRadius.xl,
     padding: theme.spacing.xl,
     marginBottom: theme.spacing.xl,
@@ -492,7 +500,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
     borderRadius: theme.borderRadius.lg,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderWidth: 2,
     borderColor: theme.colors.primary,
   },
@@ -589,7 +597,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   uploadModal: {
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.cardBackground,
     borderRadius: theme.borderRadius.xl,
     padding: theme.spacing.xl,
     alignItems: 'center',

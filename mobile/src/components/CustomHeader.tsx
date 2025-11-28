@@ -1,13 +1,16 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { HeaderProfileButton } from './HeaderProfileButton';
-import { theme } from '../constants/theme';
+import { useTheme } from '../contexts/ThemeContext';
+import { Theme } from '../constants/theme';
 
 interface CustomHeaderProps {
   title: string;
 }
 
 export const CustomHeader: React.FC<CustomHeaderProps> = ({ title }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   return (
     <View style={styles.header}>
       <Text style={styles.headerTitle}>{title}</Text>
@@ -16,7 +19,7 @@ export const CustomHeader: React.FC<CustomHeaderProps> = ({ title }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',

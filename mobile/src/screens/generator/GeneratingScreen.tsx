@@ -6,7 +6,8 @@ import { RouteProp, CommonActions } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import apiService from '../../services/api.service';
 import { GenerateWorkoutRequest } from '../../types/api.types';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
 
 type GeneratingScreenProps = {
@@ -15,6 +16,8 @@ type GeneratingScreenProps = {
 };
 
 const GeneratingScreen: React.FC<GeneratingScreenProps> = ({ navigation, route }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const workoutData = route.params;
   const [status, setStatus] = useState('Preparazione del tuo piano di allenamento...');
   const { completeOnboarding } = useAuth();
@@ -103,7 +106,7 @@ const GeneratingScreen: React.FC<GeneratingScreenProps> = ({ navigation, route }
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,

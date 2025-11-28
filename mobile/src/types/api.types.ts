@@ -163,6 +163,7 @@ export interface NewsArticle {
   category: string;
   sponsored: boolean;
   publishedAt: string;
+  content?: string;
 }
 
 export interface NewsResponse {

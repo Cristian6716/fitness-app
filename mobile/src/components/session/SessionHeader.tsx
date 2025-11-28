@@ -7,7 +7,8 @@ import {
   Vibration,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 
 interface SessionHeaderProps {
   sessionName: string;
@@ -22,6 +23,8 @@ const SessionHeader: React.FC<SessionHeaderProps> = ({
   onBack,
   onEdit,
 }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
 
   const formatTime = (seconds: number): string => {
@@ -85,9 +88,9 @@ const SessionHeader: React.FC<SessionHeaderProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.borderLight,
     shadowColor: theme.colors.black,

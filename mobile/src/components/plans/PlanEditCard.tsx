@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 
 interface PlanEditCardProps {
   name: string;
@@ -19,6 +20,8 @@ const PlanEditCard: React.FC<PlanEditCardProps> = ({
   onFrequencyChange,
   onDurationChange,
 }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Informazioni Piano</Text>
@@ -63,9 +66,9 @@ const PlanEditCard: React.FC<PlanEditCardProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     padding: theme.spacing.lg,
     borderRadius: theme.borderRadius.lg,
     marginHorizontal: theme.spacing.md,
@@ -92,7 +95,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   input: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderWidth: 1,
     borderColor: theme.colors.primary,
     borderRadius: theme.borderRadius.md,

@@ -1,25 +1,44 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { z } from 'zod';
 import prisma from '../utils/prisma';
-import { RegisterRequest, LoginRequest, AuthResponse } from '../types/auth.types';
+import { AuthResponse } from '../types/auth.types';
+import logger from '../utils/logger';
 
 const SALT_ROUNDS = 10;
 
+// Zod Schemas
+const registerSchema = z.object({
+  email: z.string().email('Email non valida'),
+  password: z.string().min(6, 'La password deve essere di almeno 6 caratteri'),
+  profile: z.object({
+    age: z.number().optional(),
+    weight: z.number().optional(),
+    height: z.number().optional(),
+    fitness_level: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
+  }).optional(),
+});
+
+const loginSchema = z.object({
+  email: z.string().email('Email non valida'),
+  password: z.string().min(1, 'Password obbligatoria'),
+});
+
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password, profile } = req.body;
-
     // Validation
-    if (!email || !password) {
-      res.status(400).json({ error: 'Email e password sono obbligatori' });
+    const validationResult = registerSchema.safeParse(req.body);
+
+    if (!validationResult.success) {
+      res.status(400).json({
+        error: 'Dati non validi',
+        details: validationResult.error.issues.map(e => e.message)
+      });
       return;
     }
 
-    if (password.length < 6) {
-      res.status(400).json({ error: 'La password deve essere di almeno 6 caratteri' });
-      return;
-    }
+    const { email, password, profile } = validationResult.data;
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -65,22 +84,28 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       },
     };
 
+    logger.info(`New user registered: ${email}`);
     res.status(201).json(response);
   } catch (error) {
-    console.error('Register error:', error);
+    logger.error('Register error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
 
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password } = req.body as LoginRequest;
-
     // Validation
-    if (!email || !password) {
-      res.status(400).json({ error: 'Email e password sono obbligatori' });
+    const validationResult = loginSchema.safeParse(req.body);
+
+    if (!validationResult.success) {
+      res.status(400).json({
+        error: 'Dati non validi',
+        details: validationResult.error.issues.map(e => e.message)
+      });
       return;
     }
+
+    const { email, password } = validationResult.data;
 
     // Find user
     const user = await prisma.user.findUnique({
@@ -122,9 +147,10 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       },
     };
 
+    logger.info(`User logged in: ${email}`);
     res.status(200).json(response);
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error('Login error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

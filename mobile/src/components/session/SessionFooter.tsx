@@ -8,7 +8,8 @@ import {
   Vibration,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 
 interface SessionFooterProps {
   // Rest timer state
@@ -32,6 +33,8 @@ const SessionFooter: React.FC<SessionFooterProps> = ({
   sessionStatus,
   isCompletingSession = false,
 }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(0)).current;
 
@@ -150,7 +153,7 @@ const SessionFooter: React.FC<SessionFooterProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     position: 'absolute',
     bottom: 0,
@@ -162,7 +165,7 @@ const styles = StyleSheet.create({
 
   // Normal State
   normalContainer: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderTopWidth: 1,
     borderTopColor: theme.colors.borderLight,
     shadowColor: theme.colors.black,

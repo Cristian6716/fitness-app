@@ -7,7 +7,8 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 import ExerciseEditRow from './ExerciseEditRow';
 
 interface Exercise {
@@ -39,6 +40,8 @@ const SessionEditItem: React.FC<SessionEditItemProps> = ({
   onAddExercise,
   onSessionDelete,
 }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const handleDeleteSession = () => {
     Alert.alert(
       'Elimina Sessione',
@@ -122,9 +125,9 @@ const SessionEditItem: React.FC<SessionEditItemProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderRadius: theme.borderRadius.lg,
     marginHorizontal: theme.spacing.md,
     marginBottom: theme.spacing.md,
@@ -168,7 +171,7 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.lg,
     fontWeight: theme.fontWeight.semibold,
     color: theme.colors.text,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.cardBackground,
     borderWidth: 1,
     borderColor: theme.colors.primary,
     borderRadius: theme.borderRadius.md,

@@ -8,25 +8,35 @@ import sessionRoutes from './routes/session.routes';
 import uploadRoutes from './routes/upload';
 import statsRoutes from './routes/stats.routes';
 import newsRoutes from './routes/news';
+import measurementRoutes from './routes/measurement.routes';
 import { fetchAndSaveArticles } from './services/rssParser';
 import { setupLocalTunnel, disconnectLocalTunnel } from './localtunnel-setup';
+import logger from './utils/logger';
+import { authenticateToken } from './middleware/auth.middleware';
 
 dotenv.config();
 
 // Global error handlers - MUST be at the top
 process.on('uncaughtException', (error) => {
-  console.error('💥 UNCAUGHT EXCEPTION - SERVER CRASH:');
-  console.error('Error name:', error.name);
-  console.error('Error message:', error.message);
-  console.error('Error stack:', error.stack);
-  console.error('Full error:', error);
+  // Ignore LocalTunnel errors to prevent server crash
+  if (error.message.includes('connection refused') && error.stack?.includes('TunnelCluster')) {
+    logger.warn('⚠️ LocalTunnel connection error (non-fatal):', error.message);
+    return;
+  }
+
+  logger.error('💥 UNCAUGHT EXCEPTION - SERVER CRASH:', {
+    name: error.name,
+    message: error.message,
+    stack: error.stack,
+  });
   process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('💥 UNHANDLED REJECTION:');
-  console.error('Reason:', reason);
-  console.error('Promise:', promise);
+  logger.error('💥 UNHANDLED REJECTION:', {
+    reason,
+    promise,
+  });
 });
 
 const app = express();
@@ -42,12 +52,16 @@ app.get('/health', (req, res) => {
 });
 
 // API Routes
+import { getStats } from './controllers/stats.controller';
+
 app.use('/api/auth', authRoutes);
 app.use('/api/workouts', workoutRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/plans', uploadRoutes);
-app.use('/api/stats', statsRoutes);
+app.get('/api/stats', authenticateToken, getStats); // New specific GET route for /api/stats
+app.use('/api/stats', statsRoutes); // Existing general stats routes
 app.use('/api/news', newsRoutes);
+app.use('/api/measurements', measurementRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -56,15 +70,15 @@ app.use((req, res) => {
 
 // Express error middleware - comprehensive error logging
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('🔥 EXPRESS ERROR MIDDLEWARE:');
-  console.error('Error name:', err.name);
-  console.error('Error message:', err.message);
-  console.error('Error stack:', err.stack);
-  console.error('Request URL:', req.url);
-  console.error('Request method:', req.method);
-  console.error('Request body:', req.body);
-  console.error('Request headers:', req.headers);
-  console.error('Full error:', err);
+  logger.error('🔥 EXPRESS ERROR MIDDLEWARE:', {
+    name: err.name,
+    message: err.message,
+    stack: err.stack,
+    url: req.url,
+    method: req.method,
+    body: req.body,
+    headers: req.headers,
+  });
 
   res.status(err.status || 500).json({
     error: err.message || 'Internal server error'
@@ -73,46 +87,38 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 // Start server
 const server = app.listen(PORT, async () => {
-  console.log('=================================');
-  console.log('🚀 SERVER STARTED');
-  console.log('Port:', PORT);
-  console.log('Environment:', process.env.NODE_ENV || 'development');
-  console.log(`Health: http://localhost:${PORT}/health`);
-  console.log('Body size limit: 50MB');
-  console.log('File upload limit: 50MB');
-  console.log('Request timeout: 120s (frontend)');
-  console.log('=================================');
+  logger.info('=================================');
+  logger.info('🚀 SERVER STARTED');
+  logger.info(`Port: ${PORT}`);
+  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info(`Health: http://localhost:${PORT}/health`);
+  logger.info('=================================');
 
   // Setup LocalTunnel if ENABLE_TUNNEL is set
   if (process.env.ENABLE_TUNNEL === 'true') {
     try {
       await setupLocalTunnel(PORT);
     } catch (error) {
-      console.error('Failed to setup LocalTunnel, continuing with local server only');
+      logger.error('Failed to setup LocalTunnel, continuing with local server only');
     }
   }
 
   // Setup cron job for daily RSS feed fetch at 8:00 AM
   cron.schedule('0 8 * * *', async () => {
-    console.log('🗞️  Running scheduled RSS fetch...');
+    logger.info('🗞️  Running scheduled RSS fetch...');
     try {
       const result = await fetchAndSaveArticles();
-      console.log(`✅ RSS fetch complete: ${result.added} added, ${result.skipped} skipped`);
+      logger.info(`✅ RSS fetch complete: ${result.added} added, ${result.skipped} skipped`);
     } catch (error) {
-      console.error('❌ RSS fetch failed:', error instanceof Error ? error.message : 'Unknown error');
+      logger.error('❌ RSS fetch failed:', { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
-  console.log('📅 RSS cron job scheduled: Daily at 8:00 AM');
+  logger.info('📅 RSS cron job scheduled: Daily at 8:00 AM');
 });
-
-// CRITICAL: Keep Node.js process alive
-setInterval(() => {
-  // Empty interval prevents process from exiting
-}, 1000);
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
-  console.log('\nShutting down...');
+  logger.info('\nShutting down...');
   await disconnectLocalTunnel();
   server.close(() => {
     process.exit(0);

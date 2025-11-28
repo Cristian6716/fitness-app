@@ -1,12 +1,13 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
+import { StatusBar } from 'expo-status-bar';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { ActivityIndicator, View, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { theme } from '../constants/theme';
 
 // Auth Screens
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -19,7 +20,9 @@ import FileUploadScreen from '../screens/home/FileUploadScreen';
 import PlansScreen from '../screens/plans/PlansScreen';
 import { NewsScreen } from '../screens/news/NewsScreen';
 import { NewsDetailScreen } from '../screens/news/NewsDetailScreen';
-import { ProfileModal } from '../components/ProfileModal';
+import { ProfileScreen } from '../screens/profile/ProfileScreen';
+import { MeasurementsScreen } from '../screens/profile/MeasurementsScreen';
+import { StatisticsScreen } from '../screens/profile/StatisticsScreen';
 import { HeaderProfileButton } from '../components/HeaderProfileButton';
 
 // Workout Generator Screens
@@ -84,11 +87,14 @@ export interface WorkoutData extends PersonalInfo {
 
 export type RootStackParamList = {
   MainTabs: undefined;
-  ProfileModal: undefined;
+  Profile: undefined;
+  Measurements: undefined;
+  Statistics: undefined;
   FirstTime: undefined;
   FileUpload: undefined;
   PersonalInfo: undefined;
   GoalSelection: { personalInfo: PersonalInfo };
+  DaysPerWeek: { personalInfo: PersonalInfo; goal: string; goalDetails?: string };
   Frequency: { personalInfo: PersonalInfo; goal: string; goalDetails?: string };
   Equipment: { personalInfo: PersonalInfo; goal: string; goalDetails?: string; daysPerWeek: number; sessionDuration?: number; scheduleNotes?: string };
   Experience: Partial<WorkoutData>;
@@ -117,6 +123,7 @@ const AuthNavigator = () => {
 
 const MainTabs = () => {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
 
   // Calcola il padding bottom: usa insets o un minimo di 8px
   const bottomPadding = Math.max(insets.bottom, 8);
@@ -125,14 +132,15 @@ const MainTabs = () => {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: theme.colors.primaryDarker,
+        tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.textSecondary,
         tabBarStyle: {
           paddingBottom: bottomPadding,
           paddingTop: 8,
           height: 60 + bottomPadding,
           borderTopWidth: 1,
-          borderTopColor: '#E0E0E0',
+          borderTopColor: theme.colors.border,
+          backgroundColor: theme.colors.background,
         },
         tabBarLabelStyle: {
           fontSize: 12,
@@ -177,10 +185,20 @@ const MainTabs = () => {
 
 const RootNavigator = () => {
   const { user } = useAuth();
+  const { theme } = useTheme();
 
   return (
     <RootStack.Navigator
       initialRouteName={user?.hasCompletedOnboarding ? 'MainTabs' : 'FirstTime'}
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: theme.colors.background,
+        },
+        headerTintColor: theme.colors.text,
+        contentStyle: {
+          backgroundColor: theme.colors.background,
+        },
+      }}
     >
       <RootStack.Screen
         name="MainTabs"
@@ -268,25 +286,58 @@ const RootNavigator = () => {
         component={NewsDetailScreen}
         options={{ headerShown: false }}
       />
+      <RootStack.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <RootStack.Screen
+        name="Measurements"
+        component={MeasurementsScreen}
+        options={{ title: 'Misure Corporee' }}
+      />
+      <RootStack.Screen
+        name="Statistics"
+        component={StatisticsScreen}
+        options={{ title: 'Statistiche', headerShown: false }}
+      />
     </RootStack.Navigator>
   );
 };
 
 const AppNavigator = () => {
   const { isAuthenticated, isLoading } = useAuth();
+  const { theme, mode } = useTheme();
+  const isDark = mode === 'dark';
+
+  // Create React Navigation theme based on our app theme
+  const navigationTheme = {
+    dark: isDark,
+    colors: {
+      primary: theme.colors.primary,
+      background: theme.colors.background,
+      card: theme.colors.background, // Or cardBackground if preferred for headers
+      text: theme.colors.text,
+      border: theme.colors.border,
+      notification: theme.colors.error,
+    },
+  };
 
   if (isLoading) {
     return (
-      <View style={loadingStyles.container}>
-        <ActivityIndicator size="large" />
+      <View style={[loadingStyles.container, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
 
   return (
-    <NavigationContainer>
-      {isAuthenticated ? <RootNavigator /> : <AuthNavigator />}
-    </NavigationContainer>
+    <>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <NavigationContainer theme={navigationTheme}>
+        {isAuthenticated ? <RootNavigator /> : <AuthNavigator />}
+      </NavigationContainer>
+    </>
   );
 };
 

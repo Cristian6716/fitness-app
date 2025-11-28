@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 import { RecentSession } from '../../types/api.types';
 
 interface RecentSessionItemProps {
@@ -10,6 +11,8 @@ interface RecentSessionItemProps {
 }
 
 export function RecentSessionItem({ session, formatRelativeTime }: RecentSessionItemProps) {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   return (
     <View style={styles.container}>
       <View style={styles.iconContainer}>
@@ -43,7 +46,7 @@ export function RecentSessionItem({ session, formatRelativeTime }: RecentSession
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',

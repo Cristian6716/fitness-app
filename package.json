@@ -1,0 +1,14 @@
+{
+    "name": "fitness-app-root",
+    "version": "1.0.0",
+    "description": "Root package to manage fitness app monorepo",
+    "scripts": {
+        "install:all": "npm install && npm install --prefix backend && npm install --prefix mobile",
+        "dev": "concurrently \"npm run dev --prefix backend\" \"npm run start --prefix mobile\"",
+        "dev:backend": "npm run dev --prefix backend",
+        "dev:mobile": "npm run start --prefix mobile"
+    },
+    "devDependencies": {
+        "concurrently": "^9.1.0"
+    }
+}

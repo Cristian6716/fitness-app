@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 
 interface StatCardProps {
   icon?: string;
@@ -11,6 +12,8 @@ interface StatCardProps {
 }
 
 export function StatCard({ icon, value, label, subtitle, style }: StatCardProps) {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   return (
     <View style={[styles.card, style]}>
       {icon && <Text style={styles.icon}>{icon}</Text>}
@@ -21,7 +24,7 @@ export function StatCard({ icon, value, label, subtitle, style }: StatCardProps)
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   card: {
     width: 110,
     height: 90,
@@ -39,6 +42,7 @@ const styles = StyleSheet.create({
   icon: {
     fontSize: 20,
     marginBottom: 4,
+    color: theme.colors.text,
   },
   value: {
     fontSize: 22,

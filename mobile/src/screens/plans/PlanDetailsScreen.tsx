@@ -14,10 +14,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { WorkoutPlan, TrainingSession, PlanStatsResponse } from '../../types/api.types';
 import apiService from '../../services/api.service';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 import { StatCard, SimpleBarChart, StatusBadge, RecentSessionItem } from '../../components/stats';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -28,7 +30,56 @@ type PlanDetailsScreenProps = {
   route: RouteProp<RootStackParamList, 'PlanDetails'>;
 };
 
+// Onboarding Progress Card Component
+const OnboardingProgressCard: React.FC<{ completedSessions: number }> = ({ completedSessions }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
+  const REQUIRED_SESSIONS = 3;
+  const progress = Math.min(completedSessions, REQUIRED_SESSIONS);
+
+  return (
+    <View style={styles.onboardingCard}>
+      <View style={styles.onboardingIconContainer}>
+        <LinearGradient
+          colors={[theme.colors.primary + '20', theme.colors.primaryDarker + '20']}
+          style={styles.onboardingIconGradient}
+        >
+          <Ionicons name="trophy-outline" size={40} color={theme.colors.primary} />
+        </LinearGradient>
+      </View>
+
+      <Text style={styles.onboardingTitle}>Inizia il tuo percorso</Text>
+      <Text style={styles.onboardingText}>
+        Completa {REQUIRED_SESSIONS} sessioni per sbloccare il grafico del volume e le statistiche avanzate.
+      </Text>
+
+      {/* Progress Blocks */}
+      <View style={styles.progressBlocksContainer}>
+        {[...Array(REQUIRED_SESSIONS)].map((_, index) => (
+          <View
+            key={index}
+            style={[
+              styles.progressBlock,
+              index < progress && styles.progressBlockCompleted,
+            ]}
+          >
+            {index < progress && (
+              <Ionicons name="checkmark" size={16} color={theme.colors.white} />
+            )}
+          </View>
+        ))}
+      </View>
+
+      <Text style={styles.onboardingProgress}>
+        {progress}/{REQUIRED_SESSIONS} sessioni completate
+      </Text>
+    </View>
+  );
+};
+
 const PlanDetailsScreen: React.FC<PlanDetailsScreenProps> = ({ navigation, route }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const { planId } = route.params;
   const [plan, setPlan] = useState<WorkoutPlan | null>(null);
   const [stats, setStats] = useState<PlanStatsResponse | null>(null);
@@ -112,6 +163,8 @@ const PlanDetailsScreen: React.FC<PlanDetailsScreenProps> = ({ navigation, route
   }
 
   const currentWeekVolume = stats?.weeklyVolume[stats.weeklyVolume.length - 1]?.volume || 0;
+  const completedSessions = stats?.summary.completedSessions || 0;
+  const hasUnlockedStats = completedSessions >= 3;
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -162,8 +215,12 @@ const PlanDetailsScreen: React.FC<PlanDetailsScreenProps> = ({ navigation, route
         {/* Stats Section */}
         {stats && (
           <>
-            {/* Weekly Volume Chart - Moved to top */}
-            <SimpleBarChart data={stats.weeklyVolume} currentWeekVolume={currentWeekVolume} />
+            {/* Conditional: Onboarding Card OR Weekly Volume Chart */}
+            {hasUnlockedStats ? (
+              <SimpleBarChart data={stats.weeklyVolume} currentWeekVolume={currentWeekVolume} />
+            ) : (
+              <OnboardingProgressCard completedSessions={completedSessions} />
+            )}
 
             {/* KPI Cards - Scroll Orizzontale */}
             <ScrollView
@@ -223,40 +280,51 @@ const PlanDetailsScreen: React.FC<PlanDetailsScreenProps> = ({ navigation, route
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Sessioni di Allenamento</Text>
 
-          {plan.trainingSessions.map((session, index) => (
-            <TouchableOpacity
-              key={session.id}
-              style={[styles.sessionCard, { borderLeftColor: getAccentColor(index) }]}
-              onPress={() => handleSessionPress(session)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.sessionHeader}>
-                <Text style={styles.sessionDay}>Day {session.dayNumber}</Text>
-              </View>
+          {plan.trainingSessions.map((session, index) => {
+            const accentColor = getAccentColor(index);
+            return (
+              <TouchableOpacity
+                key={session.id}
+                style={styles.sessionCard}
+                onPress={() => handleSessionPress(session)}
+                activeOpacity={0.7}
+              >
+                {/* Colored Vertical Pill */}
+                <View style={[styles.sessionPill, { backgroundColor: accentColor }]} />
 
-              <Text style={styles.sessionName}>{session.name}</Text>
+                {/* Content Container */}
+                <View style={styles.sessionContent}>
+                  <View style={styles.sessionInfo}>
+                    <Text style={styles.sessionDay}>Day {session.dayNumber}</Text>
+                    <Text style={styles.sessionName}>{session.name}</Text>
+                    <View style={styles.sessionMeta}>
+                      <Ionicons
+                        name="barbell-outline"
+                        size={14}
+                        color={theme.colors.textSecondary}
+                        style={{ marginRight: 4 }}
+                      />
+                      <Text style={styles.sessionMetaText}>
+                        {session.exercises.length} Esercizi
+                      </Text>
+                    </View>
+                  </View>
 
-              <View style={styles.sessionMeta}>
-                <Text style={styles.sessionMetaText}>
-                  {session.exercises.length} esercizi
-                </Text>
-              </View>
-
-              <Ionicons
-                name="chevron-forward"
-                size={24}
-                color={theme.colors.textLight}
-                style={styles.sessionChevron}
-              />
-            </TouchableOpacity>
-          ))}
+                  {/* Start Button */}
+                  <View style={[styles.startButton, { backgroundColor: accentColor }]}>
+                    <Ionicons name="play" size={20} color={theme.colors.white} />
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.backgroundSecondary,
@@ -291,17 +359,19 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
   },
   headerTitleMain: {
-    fontSize: theme.fontSize.lg,
+    fontSize: 20,
     fontWeight: theme.fontWeight.bold,
     color: theme.colors.text,
     textAlign: 'center',
   },
   headerTitleSub: {
-    fontSize: theme.fontSize.sm,
+    fontSize: 14,
     fontWeight: theme.fontWeight.medium,
     color: theme.colors.textSecondary,
     textAlign: 'center',
-    marginTop: 2,
+    marginTop: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
 
   scrollView: {
@@ -334,50 +404,138 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
 
-  // Session Cards
+  // Session Cards - Modern Clean Style with Vertical Pill
   sessionCard: {
-    backgroundColor: theme.colors.background,
-    borderRadius: theme.borderRadius.lg,
-    borderLeftWidth: 4,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-    minHeight: 90,
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: theme.borderRadius.xl,
+    marginBottom: theme.spacing.md,
+    minHeight: 110,
     shadowColor: theme.colors.black,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  sessionHeader: {
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    overflow: 'hidden',
+  },
+  sessionPill: {
+    width: 6,
+    borderTopLeftRadius: theme.borderRadius.xl,
+    borderBottomLeftRadius: theme.borderRadius.xl,
+  },
+  sessionContent: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: theme.spacing.xs,
+    justifyContent: 'space-between',
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+  },
+  sessionInfo: {
+    flex: 1,
+    justifyContent: 'center',
   },
   sessionDay: {
     fontSize: theme.fontSize.xs,
     fontWeight: theme.fontWeight.semibold,
     color: theme.colors.textSecondary,
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
   },
   sessionName: {
     fontSize: theme.fontSize.lg,
     fontWeight: theme.fontWeight.bold,
     color: theme.colors.text,
     marginBottom: theme.spacing.xs,
+    lineHeight: 24,
   },
   sessionMeta: {
-    marginBottom: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   sessionMetaText: {
     fontSize: theme.fontSize.sm,
     color: theme.colors.textSecondary,
+    fontWeight: theme.fontWeight.medium,
   },
-  sessionChevron: {
-    position: 'absolute',
-    right: theme.spacing.md,
-    top: '50%',
-    marginTop: -12,
+  startButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: theme.spacing.sm,
+    shadowColor: theme.colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+
+  // Onboarding Progress Card Styles
+  onboardingCard: {
+    backgroundColor: theme.colors.cardBackground,
+    marginHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.xl,
+    alignItems: 'center',
+    shadowColor: theme.colors.black,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  onboardingIconContainer: {
+    marginBottom: theme.spacing.md,
+  },
+  onboardingIconGradient: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  onboardingTitle: {
+    fontSize: theme.fontSize.xl,
+    fontWeight: theme.fontWeight.bold,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.sm,
+    textAlign: 'center',
+  },
+  onboardingText: {
+    fontSize: theme.fontSize.md,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.sm,
+  },
+  progressBlocksContainer: {
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+  },
+  progressBlock: {
+    width: 60,
+    height: 60,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.backgroundSecondary,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressBlockCompleted: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  onboardingProgress: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.semibold,
+    color: theme.colors.textSecondary,
   },
 });
 

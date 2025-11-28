@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CONFIG } from '../config';
 import {
   RegisterRequest,
   LoginRequest,
@@ -14,7 +15,7 @@ import {
   NewsArticle,
 } from '../types/api.types';
 
-const API_BASE_URL = 'https://ripe-dingos-flash.loca.lt/api';
+const API_BASE_URL = CONFIG.API_BASE_URL;
 const TOKEN_KEY = '@fitness_app_token';
 
 class ApiService {
@@ -23,7 +24,7 @@ class ApiService {
   constructor() {
     this.api = axios.create({
       baseURL: API_BASE_URL,
-      timeout: 30000,
+      timeout: CONFIG.TIMEOUT,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -252,6 +253,16 @@ class ApiService {
   }
 
   // Stats endpoints
+  async getStats(): Promise<{
+    totalWorkouts: number;
+    totalVolume: number;
+    workoutsPerWeek: { week: string; count: number }[];
+    lastWorkoutDate: string | null;
+  }> {
+    const response = await this.api.get('/stats');
+    return response.data;
+  }
+
   async getWeeklyStats(): Promise<{
     workoutsThisWeek: number;
     volumeThisWeek: number;

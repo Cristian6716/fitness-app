@@ -3,7 +3,8 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Theme } from '../../constants/theme';
 import { GradientButton } from '../../components/GradientButton';
 
 type PersonalInfoScreenProps = {
@@ -11,6 +12,8 @@ type PersonalInfoScreenProps = {
 };
 
 const PersonalInfoScreen: React.FC<PersonalInfoScreenProps> = ({ navigation }) => {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
   const [age, setAge] = useState('');
   const [weight, setWeight] = useState('');
   const [height, setHeight] = useState('');
@@ -66,81 +69,81 @@ const PersonalInfoScreen: React.FC<PersonalInfoScreenProps> = ({ navigation }) =
         >
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View>
-            <Text style={styles.title}>Dati Personali</Text>
-            <Text style={styles.subtitle}>Iniziamo con alcune informazioni di base</Text>
+              <Text style={styles.title}>Dati Personali</Text>
+              <Text style={styles.subtitle}>Iniziamo con alcune informazioni di base</Text>
 
-            <View style={styles.section}>
-              <Text style={styles.label}>Età *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Es: 25"
-                value={age}
-                onChangeText={setAge}
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.label}>Peso (kg) *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Es: 70"
-                value={weight}
-                onChangeText={setWeight}
-                keyboardType="decimal-pad"
-              />
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.label}>Altezza (cm) *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Es: 175"
-                value={height}
-                onChangeText={setHeight}
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.label}>Sesso *</Text>
-              <View style={styles.genderContainer}>
-                <TouchableOpacity
-                  style={[styles.genderButton, gender === 'male' && styles.genderButtonActive]}
-                  onPress={() => setGender('male')}
-                >
-                  <Text style={[styles.genderText, gender === 'male' && styles.genderTextActive]}>
-                    Maschio
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.genderButton, gender === 'female' && styles.genderButtonActive]}
-                  onPress={() => setGender('female')}
-                >
-                  <Text style={[styles.genderText, gender === 'female' && styles.genderTextActive]}>
-                    Femmina
-                  </Text>
-                </TouchableOpacity>
+              <View style={styles.section}>
+                <Text style={styles.label}>Età *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Es: 25"
+                  value={age}
+                  onChangeText={setAge}
+                  keyboardType="numeric"
+                />
               </View>
+
+              <View style={styles.section}>
+                <Text style={styles.label}>Peso (kg) *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Es: 70"
+                  value={weight}
+                  onChangeText={setWeight}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+
+              <View style={styles.section}>
+                <Text style={styles.label}>Altezza (cm) *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Es: 175"
+                  value={height}
+                  onChangeText={setHeight}
+                  keyboardType="numeric"
+                />
+              </View>
+
+              <View style={styles.section}>
+                <Text style={styles.label}>Sesso *</Text>
+                <View style={styles.genderContainer}>
+                  <TouchableOpacity
+                    style={[styles.genderButton, gender === 'male' && styles.genderButtonActive]}
+                    onPress={() => setGender('male')}
+                  >
+                    <Text style={[styles.genderText, gender === 'male' && styles.genderTextActive]}>
+                      Maschio
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.genderButton, gender === 'female' && styles.genderButtonActive]}
+                    onPress={() => setGender('female')}
+                  >
+                    <Text style={[styles.genderText, gender === 'female' && styles.genderTextActive]}>
+                      Femmina
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <Text style={styles.helper}>* Campi obbligatori</Text>
+
+              <GradientButton
+                title="Continua"
+                onPress={handleNext}
+                disabled={!age || !weight || !height || !gender}
+                style={styles.button}
+              />
             </View>
-
-            <Text style={styles.helper}>* Campi obbligatori</Text>
-
-            <GradientButton
-              title="Continua"
-              onPress={handleNext}
-              disabled={!age || !weight || !height || !gender}
-              style={styles.button}
-            />
-          </View>
-        </TouchableWithoutFeedback>
-      </ScrollView>
+          </TouchableWithoutFeedback>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -180,6 +183,7 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
     fontSize: theme.fontSize.md,
     backgroundColor: theme.colors.background,
+    color: theme.colors.text,
   },
   genderContainer: {
     flexDirection: 'row',

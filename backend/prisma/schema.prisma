@@ -20,8 +20,39 @@ model User {
 
   workoutPlans      WorkoutPlan[]
   completedSessions CompletedSession[]
+  bodyMeasurements  BodyMeasurement[]
 
   @@map("users")
+}
+
+model BodyMeasurement {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  date      DateTime @default(now())
+  
+  weight    Float?   // kg
+  bodyFat   Float?   // %
+  
+  // Circumferences (cm)
+  chest     Float?
+  waist     Float?
+  hips      Float?
+  shoulders Float?
+  biceps    Float?   // Right/Left average or specific
+  forearms  Float?
+  thighs    Float?
+  calves    Float?
+  neck      Float?
+  
+  notes     String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@map("body_measurements")
 }
 
 model WorkoutPlan {
@@ -66,6 +97,9 @@ model Exercise {
   restSeconds  Int     @default(60) @map("rest_seconds")
   order        Int
   notes        String?
+  technicalInstructions   String? @map("technical_instructions")
+  progressiveOverloadTips String? @map("progressive_overload_tips")
+  physicalCautions        String? @map("physical_cautions")
 
   session       TrainingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   completedSets CompletedSet[]
